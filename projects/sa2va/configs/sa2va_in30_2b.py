@@ -24,6 +24,7 @@ from projects.sa2va.datasets.data_utils import ConcatDatasetSa2VA
 #######################################################################
 # Model
 # huggingface-cli download --local-dir-use-symlinks False --local-dir ./pretrained/internvl3/InternVL3-2B OpenGVLab/InternVL3-2B
+# 文件最后的2b指的是预训练的MLLM的模型参数量大约是2b
 path = 'OpenGVLab/InternVL3-2B'
 pretrained_pth = None
 

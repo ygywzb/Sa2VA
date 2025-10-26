@@ -39,12 +39,17 @@ class Sa2VAModel(BaseModel):
                  training_bs:int=0,
                  ):
         super().__init__()
+        # 看配置文件
         if special_tokens is None:
             special_tokens = ['[SEG]']
 
+        # 注入大语言模型，并指明架构类型
         self.mllm = BUILDER.build(mllm)
         self.arch_type = arch_type
 
+        # 注入tokenizer，并添加特殊token
+        # 需要mllm自身的架构支持新增token，使其可以学到新的token来时要做什么操作
+        # 同时他也会学习到输入是什么场景下要输出<SEG>token
         tokenizer = BUILDER.build(tokenizer)
         self._add_special_tokens(tokenizer, special_tokens)
 
@@ -53,17 +58,28 @@ class Sa2VAModel(BaseModel):
             video_processor = AutoVideoProcessor.from_pretrained(mllm['model_path'], trust_remote_code=True)
             self.mllm._init_processor(image_processor, video_processor)
 
+        # 图像编码器，会基于第三方的SAM2模型配置生成对应实例
+        # 他是一个包装类，封装了SAM2模型，并提供了一些便捷的编码方法，默认冻结
         self.grounding_encoder = BUILDER.build(grounding_encoder)
         self.grounding_encoder.requires_grad_(False)
+        # 而解码器按需要冻结
         if not frozen_sam2_decoder:
             self.grounding_encoder.sam2_model.sam_mask_decoder.requires_grad_(True)
 
+        # 为mllm启用lora微调
+        # 基本上是mllm会为lora重新准备自身的模型结构
+        self.mllm.manual_prepare_llm_for_lora()
+        self.mllm.use_llm_lora = True
+        self.mllm.use_visual_encoder_lora = False
+
+        # 定义了一个层，可以从mllm认识的维度转到sam2认识的维度
         in_dim = self.mllm.get_embedding_size()
         out_dim = self.grounding_encoder.hidden_dim
         self.text_hidden_fcs = nn.Sequential(
             nn.Linear(in_dim, in_dim), nn.ReLU(inplace=True),
             nn.Linear(in_dim, out_dim), nn.Dropout(0.0)
         )
+        # 两个损失函数
         self.loss_mask = BUILDER.build(loss_mask)
         self.loss_dice = BUILDER.build(loss_dice)
 
@@ -74,12 +90,18 @@ class Sa2VAModel(BaseModel):
             self.load_state_dict(pretrained_state_dict, strict=False)
             print(f'Load pretrained weight from {pretrained_pth}')
 
+        # 计算掩膜的损失函数设置，只采样掩膜中的一部分点来算损失
+        # 默认是用采样的，且采样12544个点
         self.loss_sample_points = loss_sample_points
         self.num_points = num_points
+        # 过采样，即先采样更多的点，这里选的3倍，然后再从中选取重要的点
+        # 高误差的点占0.75比例，剩下的均匀采样
         self.oversample_ratio = 3.0
         self.importance_sample_ratio = 0.75
 
+        # 配置文件里有，但是没传进来
         self.template = template
+        # 训练的batch size
         self.bs = training_bs
 
         self.mllm.manual_prepare_llm_for_lora()
@@ -96,6 +118,8 @@ class Sa2VAModel(BaseModel):
             total_params = 0
             trainable_params = 0
             
+            # 每次迭代拿到的就是一个权重张量或偏置张量
+            # 统计多少可训练，多少是冻结的
             for name, param in base_model.named_parameters():
                 total_params += param.numel()
                 if param.requires_grad:

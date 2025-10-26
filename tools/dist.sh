@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# bash tools/dist.sh train projects/sa2va/configs/sa2va_in30_8b.py 8
 set -x
 
 FILE=$1
@@ -12,6 +13,7 @@ MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
 DEEPSPEED=${DEEPSPEED:-deepspeed_zero2}
 
 
+# 根据是否安装torchrun选择不同的分布式启动方式
 if command -v torchrun &> /dev/null
 then
   echo "Using torchrun mode."

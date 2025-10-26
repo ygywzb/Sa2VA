@@ -50,6 +50,7 @@ class SAM2TrainRunner(BaseModule):
         # Read config and init model
         cfg = compose(config_name=cfg_path, overrides=hydra_overrides)
         OmegaConf.resolve(cfg)
+        # 实例化sam2模型对象，并把预训练的参数传入模型
         sam2_model = instantiate(cfg.model, _recursive_=True)
         state_dict = load_checkpoint_with_prefix(os.path.join(BASE_DIR, ckpt_path))
         load_state_dict_to_model(sam2_model, state_dict)

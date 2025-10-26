@@ -74,6 +74,7 @@ model = dict(
     mllm=dict(
         type=InternVLMLLM,
         model_path=path,
+        # 模型里的llm和视觉编码器全冻上了
         freeze_llm=True,
         freeze_visual_encoder=True,
         llm_lora=dict(
@@ -109,6 +110,7 @@ model = dict(
 #                      PART 3  Dataset & Dataloader                   #
 #######################################################################
 
+# 看README
 DATA_ROOT = './data/'
 VIDEO_DATA_ROOT = DATA_ROOT + 'video_datas/'
 
@@ -132,6 +134,8 @@ sa2va_qa_default_dataset_configs=dict(
 ######################### ImageRefSeg ##################################
 RES_ROOT = DATA_ROOT + 'ref_seg/'
 sa2va_data_01_refseg_configs = [
+    # 图片分割任务，给图片和文本提问，给出对应的物体掩膜
+    # 最基础版本，有空间方位词
     dict(
         type=Sa2VA01RefSeg,
         name='RefCOCO',
@@ -143,6 +147,7 @@ sa2va_data_01_refseg_configs = [
         repeats=5,
         **sa2va_default_dataset_configs,
     ),
+    # 无方位词，只有外观的描述
     dict(
         type=Sa2VA01RefSeg,
         name='RefCOCO+',
@@ -154,6 +159,7 @@ sa2va_data_01_refseg_configs = [
         repeats=5,
         **sa2va_default_dataset_configs,
     ),
+    # 句子更长更复杂，用于复杂语义推理
     dict(
         type=Sa2VA01RefSeg,
         name='RefCOCOg',
@@ -171,6 +177,7 @@ sa2va_data_01_refseg_configs = [
 ######################### ImageQA ##################################
 LLAVA_ROOT = DATA_ROOT + 'llava_data/'
 sa2va_data_02_imageqa_configs = [
+    # 图片对话，给一个图片和问题，模型回答
     dict(
         type=LLaVADataset,
         name='llava_665k',
@@ -184,12 +191,17 @@ sa2va_data_02_imageqa_configs = [
 
 ######################### VideoRefSeg ##################################
 sa2va_data_03_refvos_configs = [
+    # 视频分割任务：给出视频的一系列视频帧图像与文本提问，模型需要分割出对应的每一帧的物体掩膜
     dict(
         type=Sa2VA03RefVOS,
         name='ReVOS',
+        # 视频帧放的位置，一个视频一个文件夹
         image_folder=VIDEO_DATA_ROOT + 'revos/',
+        # 保存每个视频中的描述
         expression_file=VIDEO_DATA_ROOT + 'revos/' + 'meta_expressions_train_.json',
         mask_file=VIDEO_DATA_ROOT + 'revos/' + 'mask_dict.json',
+        # 每一个栏目都是好几个数据集拼起来的，有的多有的少
+        # 因此让这个数据集多重复几次，防止数据量少的数据集被淹没
         repeats=10,
         dataset_type='default',
         **sa2va_default_dataset_configs
@@ -227,7 +239,9 @@ sa2va_data_03_refvos_configs = [
 
 ######################### VideoQA ##################################
 sa2va_data_04_videoqa_configs = [
+    # 视频对话
     dict(
+        # 输入一个视频/一系列视频帧和问题，模型给出文字回答
         type=Sa2VA04VideoQA,
         name='VideoQA',
         image_folder=VIDEO_DATA_ROOT + 'chat_univi/Activity_Videos/',
@@ -240,6 +254,7 @@ sa2va_data_04_videoqa_configs = [
 
 ######################### GCG ##################################
 sa2va_data_05_gcg_configs = [
+    # 带定位的图像描述生成，给图片和文本提示，模型需要生成对应的描述，并且分割出对应的物体掩膜
     dict(
         type=Sa2VA05GCGDataset,
         name='GCG_01_RefCOCOg',
@@ -287,6 +302,7 @@ data_osprey_image_folders = [
     DATA_ROOT + 'osprey-724k/coco/val2017/',
 ]
 sa2va_data_06_vp_configs = [
+    # 给出带有视觉提示的问题，模型需回答问题
     dict(
         type=Sa2VA06VPDataset,
         name='Osprey_01_conv',
@@ -305,6 +321,8 @@ sa2va_data_06_vp_configs = [
     )
 ]
 
+# 不同任务的数据集父类都是Dataset，因此可以直接拼接在一起训练
+# ConcatDataset就是把这些配置字典都转为Dataset实例后拼接在一起
 train_dataset = dict(
     type=ConcatDatasetSa2VA, datasets=[
         *sa2va_data_01_refseg_configs,
@@ -315,6 +333,7 @@ train_dataset = dict(
         *sa2va_data_06_vp_configs
     ]
 )
+# 默认用Dataloader实例
 train_dataloader = dict(
     batch_size=batch_size,
     num_workers=dataloader_num_workers,

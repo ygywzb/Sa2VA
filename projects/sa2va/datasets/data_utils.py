@@ -368,6 +368,8 @@ def opencvimg_to_pil(image: np.ndarray) -> Image.Image:
 
 class ConcatDatasetSa2VA(TorchConcatDataset):
 
+    # 干的事就是把配置字典转为了Dataset实例后传入了父类
+    # 构成了一个大的Dataset
     def __init__(self, datasets:List[dict]):
         datasets_instance = []
         for cfg in datasets:
