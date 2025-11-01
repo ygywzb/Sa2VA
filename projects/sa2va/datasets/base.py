@@ -89,8 +89,11 @@ class Sa2VADatasetMixin:
         if preprocessor_config is None:
             self.transformer = T.Compose([
                 T.Lambda(lambda img: img.convert('RGB') if img.mode != 'RGB' else img),
+                # 缩放图像，是拉伸而不是截取，只会导致变形，信息不会丢失 ——用的默认值：448
                 T.Resize((self.image_size, self.image_size), interpolation=InterpolationMode.BICUBIC),
+                # 转为tensor，注意这里会把RGB通道提升到第一维（具体看文档）
                 T.ToTensor(),
+                # 归一化处理
                 T.Normalize(mean=self.IMAGENET_MEAN, std=self.IMAGENET_STD)
             ])
             self.preprocessor = None
@@ -187,9 +190,12 @@ class Sa2VADatasetMixin:
             ori_width, ori_height = image.size
             
             # Process for grounding if needed
+            # 这里真用了，target_length=1024的DirectResize
             if hasattr(self, 'extra_image_processor') and self.extra_image_processor is not None:
                 g_image = np.array(image)
+                # 图片都拉伸成了1024x1024
                 g_image = self.extra_image_processor.apply_image(g_image)
+                # permute转换维度顺序(RGB通道提前了)，contiguous保证内存连续（保证后续高效操作）
                 g_pixel_values = torch.from_numpy(g_image).permute(2, 0, 1).contiguous()
                 extra_pixel_values.append(g_pixel_values)
 
@@ -198,6 +204,7 @@ class Sa2VADatasetMixin:
                 pixel_values.append(image)
             else:
                 # Apply transforms immediately
+                # 改变了大小，形状和上面extra_processor一样,这里大小用的默认值：448
                 transformed = self.transformer(image)
                 pixel_values.append(transformed)
 
@@ -219,6 +226,7 @@ class Sa2VADatasetMixin:
             else:
                 raise NotImplementedError(f"Preprocessor not implemented for {self.arch_type}")
         else:
+            # 堆叠，加一维
             pixel_values = torch.stack(pixel_values, dim=0)  # (n_f, 3, h, w)
             result['pixel_values'] = pixel_values
             num_total_tokens = len(images) * self.patch_token

@@ -11,4 +11,5 @@ class DirectResize:
         Expects a numpy array with shape HxWxC in uint8 format.
         """
         img = to_pil_image(image, mode='RGB')
+        # 缩放图像，是拉伸而不是截取，只会导致变形，信息不会丢失
         return np.array(img.resize((self.target_length, self.target_length)))
