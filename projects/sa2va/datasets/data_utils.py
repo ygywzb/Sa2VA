@@ -106,6 +106,8 @@ def tokenize_conversation(
                 }
             ]
     """
+    # 分词器实例由配置文件设定，注入到框架
+    # bos和eos标记句子的开始与结束，这里根据框架注入的分词器类型获取对应bos和eos的id
     bos_token_id, eos_token_id = get_bos_eos_token_ids(tokenizer)
 
     input_ids, labels = [], []
@@ -114,17 +116,24 @@ def tokenize_conversation(
         input = single_turn_conversation['input']
         input_encode = tokenizer.encode(input, add_special_tokens=False)
         if next_needs_bos_token:
+            # 列表重载了运算符，等效append操作
+            # 加上bos_token_id
             input_ids += bos_token_id
             labels += [IGNORE_INDEX] * len(bos_token_id)
         input_ids += input_encode
         labels += [IGNORE_INDEX] * len(input_encode)
         # Add output
+        # 需要计算损失的输出
+        # 若对话不指定,那就是输出需要计算损失
         output_with_loss = single_turn_conversation.get(
             'output_with_loss', True)
         output = single_turn_conversation['output']
         output_encode = tokenizer.encode(output, add_special_tokens=False)
         input_ids += output_encode
         if output_with_loss:
+            # 注意是output_encode, 即所有的输出都需要计算损失
+            # 最终的labels和input_ids长度是一样的,且除了需要计算损失的内容是实际id外
+            # 其他位置都是IGNORE_INDEX
             labels += copy.deepcopy(output_encode)
         else:
             labels += [IGNORE_INDEX] * len(output_encode)
@@ -139,6 +148,7 @@ def tokenize_conversation(
         else:
             next_needs_bos_token = False
         # Add SEP (without loss)
+        # 如果是分割任务的数据集, 套模板的时候一定会添加SEP字段
         sep = single_turn_conversation.get('sep', '')
         if sep != '':
             sep_encode = tokenizer.encode(sep, add_special_tokens=False)
@@ -154,30 +164,47 @@ def tokenize_conversation(
 
 
 # Copyright (c) OpenMMLab. All rights reserved.
+# 模板默认用的是qwen
+# qwen_chat=dict(
+#         SYSTEM=('<|im_start|>system\n{system}<|im_end|>\n'),
+#         INSTRUCTION=('<|im_start|>user\n{input}<|im_end|>\n'
+#                      '<|im_start|>assistant\n'),
+#         SUFFIX='<|im_end|>',
+#         SUFFIX_AS_EOS=True,
+#         SEP='\n',
+#         STOP_WORDS=['<|im_end|>', '<|endoftext|>']),
 def template_map_fn(example, template):
+    # 列表
     conversation = example.get("conversation", [])
+    # single_turn_conversation是conversation其中的一个引用
+    # 操作引用就是操作本身
     for i, single_turn_conversation in enumerate(conversation):
         input = single_turn_conversation.get("input", "")
         if input is None:
             input = ""
+        # 填充模板（内容和轮次），注意轮次字段不是每个模板都有的
         input_text = template.INSTRUCTION.format(input=input, round=i + 1)
         system = single_turn_conversation.get("system", "")
         if system != "" and system is not None:
             system = template.SYSTEM.format(system=system)
             input_text = system + input_text
+        # 本身没有system就只会加上INSTRUCTION部分
         single_turn_conversation["input"] = input_text
 
+        # 输出加上模板尾缀
         if template.get("SUFFIX", None):
             output_text = single_turn_conversation.get("output", "")
             output_text += template.SUFFIX
             single_turn_conversation["output"] = output_text
 
         # SUFFIX_AS_EOS is False ==> need_eos_token is True
+        # 若模板定义的SUFFIX_AS_EOS是True, 则说明suffix已经作为eos_token了
+        # 否则还是需要eos_token
         single_turn_conversation["need_eos_token"] = not template.get(
             "SUFFIX_AS_EOS", False
         )
         single_turn_conversation["sep"] = template.get("SEP", "")
-
+    # 已经修改过了
     return {"conversation": conversation}
 
 

@@ -229,6 +229,7 @@ class Sa2VADatasetMixin:
             # 堆叠，加一维
             pixel_values = torch.stack(pixel_values, dim=0)  # (n_f, 3, h, w)
             result['pixel_values'] = pixel_values
+            # 每个图片分为patch_token个token，总token数是图片数乘以每张图片的token数
             num_total_tokens = len(images) * self.patch_token
 
         if extra_pixel_values:
@@ -253,16 +254,20 @@ class Sa2VADatasetMixin:
             return f'{self.IMG_START_TOKEN}{self.IMG_CONTEXT_TOKEN * num_tokens}{self.IMG_END_TOKEN}'
         else:
             # Video case - create frame tokens
+            # 先构建一帧的模板
             if self.arch_type == 'qwen' and hasattr(self, 'patch_token') and self.patch_token == 1:
                 # For qwen with patch_token=1, we use single tokens that will be expanded later
                 frame_token_str = f'{self.IMG_START_TOKEN}{self.IMG_CONTEXT_TOKEN}{self.IMG_END_TOKEN}'
             else:
                 # For other cases, use tokens per frame
                 tokens_per_frame = num_tokens // num_frames
+                # 在一帧中，token是由一张图的patch数决定的，即里面的IMG_CONTEXT_TOKEN重复tokens_per_frame次
                 frame_token_str = f'{self.IMG_START_TOKEN}{self.IMG_CONTEXT_TOKEN * tokens_per_frame}{self.IMG_END_TOKEN}'
             
             # Repeat for all frames with newlines
+            # 重复num_frames次，中间用换行符分隔
             frame_tokens = (frame_token_str + '\n') * num_frames
+            # 清前后空格回车
             return frame_tokens.strip()
     
     def _create_image_token_string(self, num_image_tokens: int) -> str:
@@ -283,14 +288,16 @@ class Sa2VADatasetMixin:
             List of processed conversation turns
         """
         # Handle different input formats
+        # 目的就是转成这个格式的输出
         if conversations and 'input' in conversations[0] and 'output' in conversations[0]:
             # Already in the correct format (from video datasets)
             return conversations
-            
+
         input_text = ''
         out_conversation = []
         
         # Skip leading GPT messages
+        # 找出人提问gpt回答的对话，gpt开头的先跳过
         while conversations and conversations[0]['from'] == 'gpt':
             conversations = conversations[1:]
         
@@ -302,13 +309,16 @@ class Sa2VADatasetMixin:
                 # Handle image token replacement
                 if '<image>' in value:
                     if image_token_str is None:
+                        # 组装conversation时默认就加上了image标签，若根本没有图片/视频那么就移除掉
                         value = value.replace('<image>', '')
                     else:
                         assert conv_idx == 0, f"Expected conversation index to be 0, but got {conv_idx} / {value}"
                         if is_video:
                             # For video, add tokens at the beginning
+                            # 把原本的<image>换成视频专用的token字符串
                             value = value.replace('<image>', '')
                             if conv_idx == 0:
+                                # 这些视频的对话都是基于同一个视频的对话，视频标签只在第一段对话加上，之后都是围绕其交流了
                                 value = image_token_str + value
                         else:
                             # For image, replace <image> placeholder
@@ -319,8 +329,10 @@ class Sa2VADatasetMixin:
             elif msg['from'] == 'gpt':
                 out_conversation.append({
                     'input': input_text,
+                    # 还是用本身的输出 ——模模又版版
                     'output': msg['value'].strip()
                 })
+                # 临时变量
                 input_text = ''
             else:
                 raise NotImplementedError(f"Unknown message role: {msg['from']}")
@@ -343,8 +355,10 @@ class Sa2VADatasetMixin:
         """
         # Prepare data dict for template_map_fn
         data_dict = {'conversation': conversations}
+        # 套上模板，更新字典 ——具体看代码
         result = self.template_map_fn(data_dict)
         data_dict.update(result)
+        # 编码
         result = tokenize_conversation(data_dict, tokenizer=self.tokenizer, max_length=self.max_length)
         return result
     

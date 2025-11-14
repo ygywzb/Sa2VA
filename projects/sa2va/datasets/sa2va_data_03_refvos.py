@@ -266,14 +266,17 @@ class Sa2VA03RefVOS(Sa2VABaseDataset):
                     images = [opencvimg_to_pil(img) for img in data_dict['images']]
                     
                 # Process multiple images using base class method
+                # 处理图片列表，返回的字典合并至out_data_dict ——具体进去看源码
                 image_data = self._process_multiple_images(images)
                 out_data_dict.update(image_data)
                 
                 # Create video token string
+                # 创建视频的token模板 ——<|start|><img><img><img><|end|>之类的
                 num_frames = len(images)
                 image_token_str = self._create_token_string(image_data['num_image_tokens'], num_frames)
                 
                 # Process conversations using unified method
+                # 输出整理好的对话列表，对话内容包含视频/图片的token
                 conversations = self._process_conversations_for_encoding(
                     data_dict['conversations'], image_token_str, is_video=True
                 )
