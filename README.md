@@ -206,7 +206,7 @@ data/
 |   ├── LLaVA-Pretrain
 
 ```
-`sam_v_full` is the SA-V dataset, which is not included in the download link. You can download it from [here](https://ai.meta.com/datasets/segment-anything-video/).
+**Important**: `sam_v_full` is the SA-V dataset, which is not included in the download link. You can download it from **Meta** ([here](https://ai.meta.com/datasets/segment-anything-video/)). Please follow their license.
 
 
 <details open>
@@ -239,6 +239,8 @@ python tools/convert_to_hf.py projects/sa2va/configs/sa2va_in30_8b.py --pth-mode
 </details>
 
 ## Evaluation
+
+You can download Ref-SAV eval set [here🤗](https://huggingface.co/datasets/Dense-World/Sa2VA-Eval).
 
 <details open>
 <summary>Image/Video Referring Segmentation Evaluation</summary>
