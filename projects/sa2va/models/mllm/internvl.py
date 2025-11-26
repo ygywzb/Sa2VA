@@ -158,6 +158,7 @@ class InternVLMLLM(InternVL_V1_5):
         input_embeds = self.model.language_model.get_input_embeddings()(input_ids).clone()
 
         # Extract and process visual features
+        # 将视频/图像编码为特征
         vit_embeds = self.model.extract_feature(pixel_values)
         vit_embeds = vit_embeds.to(input_embeds.dtype)
         vit_embeds = vit_embeds[image_flags == 1]
