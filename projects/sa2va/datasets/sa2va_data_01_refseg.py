@@ -84,6 +84,8 @@ class Sa2VA01RefSeg(RefCocoDataset, Sa2VABaseDataset):
                 rles = mask_utils.frPyObjects([seg], height, width)
                 m = mask_utils.decode(rles)
                 m = m.astype(np.uint8)
+                # squeeze：删除所有维度为1的维度
+                # unsqueeze：添加一个维度为1的维度
                 binary_mask += m.squeeze()
             masks.append(binary_mask)
 

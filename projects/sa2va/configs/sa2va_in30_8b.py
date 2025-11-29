@@ -57,6 +57,7 @@ tokenizer = dict(
     trust_remote_code=True,
     padding_side='right')
 
+# 拉伸成1024x1024，赋值给了g_pixel_values
 extra_image_processor = dict(
     type=DirectResize,
     target_length=1024,

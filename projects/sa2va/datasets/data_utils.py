@@ -278,6 +278,8 @@ def sa2va_collect_fn(
 
     ori_length = [len(ids) for ids in input_ids]
     if len(instances) > 1:
+        # padding到同样的长度
+        # inpit_ids和labels都成定长的了
         input_ids = pad_sequence(
             input_ids, batch_first=True, padding_value=pad_index)
         labels = pad_sequence(
@@ -288,11 +290,14 @@ def sa2va_collect_fn(
 
     # Some tokenizers have the same eos token and pad token, so input_ids
     # cannot be masked directly based on the pad token id.
+    # 注意力mask，为true的位置表示需要attention
     attention_mask = torch.zeros_like(input_ids).bool()
     for i, length in enumerate(ori_length):
         attention_mask[i, :length] = True
 
+    # 还没llm的hidden_states
     bs, seq_len = input_ids.shape
+    # input_ids的position_ids，已经定长，所以batch里全就是0到seq_len-1
     position_ids = torch.arange(seq_len).unsqueeze(0).long().repeat(bs, 1)
 
     data_dict = {

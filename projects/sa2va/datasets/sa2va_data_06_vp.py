@@ -108,6 +108,7 @@ class Sa2VA06VPDataset(Sa2VABaseDataset):
             return mask
 
         binary_masks = []
+        # 分割结果列表，看_parse_description_format代码
         for object_mask in object_masks:
             binary_mask = annToMask(object_mask, height, width)
             binary_masks.append(binary_mask)
@@ -202,8 +203,12 @@ class Sa2VA06VPDataset(Sa2VABaseDataset):
         """Parse description format annotations."""
         file_name = ann_info['file_name']
         # Handle both 'description' and 'descriptions' keys
+        # 每一个description对应一个vp，描述该vp对应的分割结果 ——当然是自然语言描述
         descriptions = ann_info.get('description', ann_info.get('descriptions', []))
+        # annotation由vp（如bbox格式）和分割结果（segmentation）组成
+        # 这里只拿到segmentation部分，成一个列表
         masks = [anno["segmentation"] for anno in ann_info["annotation"]]
+        # 图像尺寸
         height = ann_info['height']
         width = ann_info['width']
 
@@ -213,6 +218,7 @@ class Sa2VA06VPDataset(Sa2VABaseDataset):
             return None
 
         # Decode masks
+        # 解码的是分割结果的掩膜, stack成一个大Tensor
         masks = self._decode_masks(masks, height, width)
         if masks is None:
             return None
@@ -300,6 +306,7 @@ class Sa2VA06VPDataset(Sa2VABaseDataset):
 
     def prepare_data(self, index: int) -> Dict[str, Any]:
         """Prepare data for training."""
+        # data_list只json解析了一下转成了字典列表
         data_dict = copy.deepcopy(self.data_list[index])
         
         # Parse annotations based on dataset type
@@ -329,12 +336,15 @@ class Sa2VA06VPDataset(Sa2VABaseDataset):
         image_data = self._process_single_image(image, self.single_image_mode)
         out_data_dict.update(image_data)
         
+        # len返回tensor第0维度的长度，也就是（小）图像块的数量
         vp_overall_mask = torch.Tensor([False] * (len(out_data_dict['pixel_values']) - 1) + [True])
         out_data_dict['vp_overall_mask'] = vp_overall_mask
         
         # Create image token string and process conversations
+        # 一个大图变成了多个小图，现在让每个小图对应一个<IMG_CONTEXT> token
         image_token_str = self._create_image_token_string(image_data['num_image_tokens'])
         conversation = self._process_conversations_for_encoding(data_dict['conversations'], image_token_str)
+        # 用llm的tokenizer把对话转成input_ids和labels
         token_dict = self.get_inputid_labels(conversation)
         out_data_dict.update(token_dict)
         return out_data_dict

@@ -158,10 +158,11 @@ class Sa2VADatasetMixin:
             if single_image_mode:
                 images = [image]
             else:
+                # 将一个大图像切分成多个（合适尺寸的）小图像列表
                 images = dynamic_preprocess(image, self.min_dynamic_patch,
                                         self.max_dynamic_patch,
                                         self.image_size, self.use_thumbnail)
-
+            # 然后把每个小图像转成标准大小（转成patch前的大小，默认448），然后stack起来
             pixel_values = [self.transformer(img) for img in images]
             pixel_values = torch.stack(pixel_values)
             result['pixel_values'] = pixel_values
@@ -191,6 +192,7 @@ class Sa2VADatasetMixin:
             
             # Process for grounding if needed
             # 这里真用了，target_length=1024的DirectResize
+            # 看配置文件
             if hasattr(self, 'extra_image_processor') and self.extra_image_processor is not None:
                 g_image = np.array(image)
                 # 图片都拉伸成了1024x1024

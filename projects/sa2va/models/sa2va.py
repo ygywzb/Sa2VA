@@ -216,8 +216,11 @@ class Sa2VAModel(BaseModel):
         return g_pixel_values, frames_per_batch, gt_masks
 
     def forward(self, data, data_samples=None, mode='loss'):
+        # 拿出拉伸成1024x1024图像数据，依然通道在前
         g_pixel_values = data.pop('g_pixel_values', None)
+        # 拿出掩膜数据
         gt_masks = data.pop('masks', None)
+        # 看sa2va_collect_fn
         frames_per_batch = data.pop('frames_per_batch', None)
         input_ids = data['input_ids']
         output = self.mllm(data, data_samples, mode)

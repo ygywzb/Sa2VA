@@ -91,6 +91,7 @@ class InternVLMLLM(InternVL_V1_5):
         """
         # Process pixel values
         pixel_values = data['pixel_values']
+        # 将pixel_values列表合成一个大Tensor
         if isinstance(pixel_values, list) or pixel_values.ndim == 5:
             if isinstance(pixel_values, list):
                 pixel_values = [
@@ -103,6 +104,7 @@ class InternVLMLLM(InternVL_V1_5):
             raise NotImplementedError("Unsupported pixel_values format")
 
         # Extract other inputs
+        # 都是input_ids相关的东西，看sa2va_collect_fn
         input_ids = data['input_ids']
         position_ids = data['position_ids']
         attention_mask = data['attention_mask']
@@ -187,6 +189,7 @@ class InternVLMLLM(InternVL_V1_5):
         input_embeds = input_embeds.reshape(B, N, C)
 
         # Forward through language model
+        # 这里没用internvl自己的多模态版forword，而是自己处理了多模态数据，输入到llm中
         outputs = self.model.language_model(
             inputs_embeds=input_embeds,
             attention_mask=attention_mask,
