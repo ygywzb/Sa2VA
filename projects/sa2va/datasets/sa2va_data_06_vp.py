@@ -137,6 +137,7 @@ class Sa2VA06VPDataset(Sa2VABaseDataset):
             
         # Resize masks to match patch grid
         target_size = int(image_size // patch_size * downsample_ratio)
+        # 一步到位：patch后再降采样的尺寸
         masks_resized = torch.nn.functional.interpolate(
             masks.unsqueeze(0).float(),
             size=(target_size, target_size),
@@ -144,6 +145,7 @@ class Sa2VA06VPDataset(Sa2VABaseDataset):
         ).squeeze(0)
         
         # Count pixels for each region
+        # 统计调整后每个分割区域的像素数量，只要有一个小于4就返回None
         region_pixels = []
         for mask in masks_resized:
             region_pixels.append(int(mask.bool().sum().item()))
@@ -330,6 +332,8 @@ class Sa2VA06VPDataset(Sa2VABaseDataset):
         out_data_dict = {}
         
         # Add masks
+        # masks shape: (n_regions, final_size, final_size,)
+        # final_size: patch后再降采样后的大小，根据arch_type不同可能是16或14
         out_data_dict['prompt_masks'] = data_dict['masks']
         
         # Process image using base class method
@@ -337,6 +341,9 @@ class Sa2VA06VPDataset(Sa2VABaseDataset):
         out_data_dict.update(image_data)
         
         # len返回tensor第0维度的长度，也就是（小）图像块的数量
+        # 此时的pixel_values：(n_this_img + 1, 3, 448, 448,)
+        # vp_overall_mask：(n_this_img + 1,)
+        # 前面的都是448局部小图，而最后一个是缩略图（为了和mask对齐用的） ——看intervl.forward代码
         vp_overall_mask = torch.Tensor([False] * (len(out_data_dict['pixel_values']) - 1) + [True])
         out_data_dict['vp_overall_mask'] = vp_overall_mask
         

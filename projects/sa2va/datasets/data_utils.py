@@ -320,6 +320,9 @@ def sa2va_collect_fn(
             data_dict['image_grid_thw'] = image_grid_thw
 
     if has_vp:
+        # 设两个图的448小图数量分别为n1, n2
+        # cat前形状分别为：(n1,), (n2,)
+        # cat后形状为：(n1 + n2,) <=> batch size = n1 + n2
         data_dict['vp_overall_mask'] = torch.cat(vp_overall_mask, dim=0)
 
     if has_prompt_mask:
