@@ -1,5 +1,7 @@
 # Sa2VA for Demo
 对Sa2VA提供的Demo调试，仅支持VSCode，请先安装好`VSCode Python`插件。
+## 显卡配置与运行情况
+`NVIDIA RTX 3080 20G`：可顺利调试至LLM推理代码`self.language_model.generate()`之前
 ## 步骤（`Sa2VA-1B`）
 1. 根据项目根目录`README.md`，安装环境并激活(uv)
 2. 运行脚本`download_sa2va_models.py`，下载模型
@@ -27,7 +29,10 @@ python ./demo/download_sa2va_models.py
                 "--select", "1"
             ],
             "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "env": {
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "30"
+            }
         }
     ]
 }
