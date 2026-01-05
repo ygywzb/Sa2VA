@@ -78,6 +78,8 @@ def visualize(pred_mask, image_path, work_dir):
     cv2.imwrite(output_path, visual_result)
 
 if __name__ == "__main__":
+    print(torch.cuda.is_available())
+
     cfg = parse_args()
     model_path = cfg.model_path
     model = AutoModelForCausalLM.from_pretrained(
@@ -86,6 +88,9 @@ if __name__ == "__main__":
         #device_map="auto",
         trust_remote_code=True
     )
+
+    model = model.cuda()
+    print(model.device)
     """
     # For distributed inference, uncomment the following lines to get device_map
     device_map=split_model(model_path)
