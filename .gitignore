@@ -108,7 +108,8 @@ checkpoints/
 checkpoints
 data/
 data
-.vscode
+# this demo need vscode settings
+# .vscode
 .idea
 .DS_Store
 *.pkl
@@ -150,3 +151,4 @@ projects/sa2va/tests/*
 
 # demo
 demo/pretrained/*
+demo/output/*.png

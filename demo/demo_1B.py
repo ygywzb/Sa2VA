@@ -82,25 +82,26 @@ if __name__ == "__main__":
 
     cfg = parse_args()
     model_path = cfg.model_path
+    
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
-        torch_dtype="auto",
-        #device_map="auto",
+        use_flash_attn=False,
+        dtype="auto",
         trust_remote_code=True
     )
 
     model = model.cuda()
     print(model.device)
-    """
+
     # For distributed inference, uncomment the following lines to get device_map
-    device_map=split_model(model_path)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_path,
-        torch_dtype=torch.bfloat16,
-        device_map=device_map,
-        trust_remote_code=True
-    )
-    """
+    # device_map=split_model(model_path)
+    # model = AutoModelForCausalLM.from_pretrained(
+    #     model_path,
+    #     use_flash_attn=False,
+    #     torch_dtype=torch.bfloat16,
+    #     device_map=device_map,
+    #     trust_remote_code=True
+    # )
 
     assert 'qwen' not in model_path.lower(), "This demo is only for Sa2VA-1B model with InternVL2.5-1B base model."
     
@@ -149,7 +150,18 @@ if __name__ == "__main__":
         _seg_idx = 0
         pred_masks = result['prediction_masks'][_seg_idx]
         for frame_idx in range(len(vid_frames)):
+            # -------------------ADD-------------------
+            # 单帧模式，循环只会运行一次
+            if cfg.select > 0 and frame_idx != 0:
+                break
+            # -------------------ADD-------------------
             pred_mask = pred_masks[frame_idx]
+            # -------------------ADD-------------------
+            # 单帧模式，只处理指定帧
+            if cfg.select > 0:
+                frame_idx = cfg.select - 1
+            # -------------------ADD-------------------
+            
             if cfg.work_dir:
                 os.makedirs(cfg.work_dir, exist_ok=True)
                 visualize(pred_mask, image_paths[frame_idx], cfg.work_dir)

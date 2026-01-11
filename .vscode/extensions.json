@@ -1,0 +1,8 @@
+{
+    // 推荐在此工作区安装的扩展
+    "recommendations": [
+        "ms-python.python"
+    ],
+    // 可选：不推荐在此工作区安装的扩展
+    "unwantedRecommendations": []
+}

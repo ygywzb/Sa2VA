@@ -1,0 +1,84 @@
+{
+    // 使用 IntelliSense 了解相关属性。 
+    // 悬停以查看现有属性的描述。
+    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "sa2va demo(1B)_VQA_1",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./demo/demo_1B.py",
+            "args": [
+                "./demo/input",
+                "--model_path", "./demo/pretrained/Sa2VA-1B",
+                "--work-dir", "./demo/output",
+                "--text", "<image>Please describe the video content.",
+                "--select", "1"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            // "justMyCode": false,
+            "env": {
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300"
+            }
+        },
+        {
+            "name": "sa2va demo(1B)_REF_SEG_1",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./demo/demo_1B.py",
+            "args": [
+                "./demo/input",
+                "--model_path", "./demo/pretrained/Sa2VA-1B",
+                "--work-dir", "./demo/output",
+                "--text", "<image>Please segment the man in the video who is riding a motorcycle on a busy street.",
+                "--select", "1"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            // "justMyCode": false,
+            "env": {
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300"
+            }
+        },
+        {
+            "name": "sa2va demo(1B)_VQA_2",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./demo/demo_1B.py",
+            "args": [
+                "./demo/input",
+                "--model_path", "./demo/pretrained/Sa2VA-1B",
+                "--work-dir", "./demo/output",
+                "--text", "<image>Please describe the video content.",
+                "--select", "2"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            // "justMyCode": false,
+            "env": {
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300"
+            }
+        },
+        {
+            "name": "sa2va demo(1B)_REF_SEG_2",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./demo/demo_1B.py",
+            "args": [
+                "./demo/input",
+                "--model_path", "./demo/pretrained/Sa2VA-1B",
+                "--work-dir", "./demo/output",
+                "--text", "<image>Please segment the grey cat in the video which stands next to a dog.",
+                "--select", "2"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            // "justMyCode": false,
+            "env": {
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300"
+            }
+        }
+    ]
+}
