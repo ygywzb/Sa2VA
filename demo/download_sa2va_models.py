@@ -1,5 +1,8 @@
 from huggingface_hub import snapshot_download
 from pathlib import Path
+import os
+
+os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 
 BASE_PATH = Path(__file__).parent.resolve()
 PRETRAINED_MODELS_PATH = BASE_PATH / "pretrained"
