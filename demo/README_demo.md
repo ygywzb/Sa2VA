@@ -10,7 +10,8 @@ source .venv/bin/activate
 ```
 2. 下载模型至`./pretrained/Sa2VA-1B`下
 ```bash
-python ./demo/download_sa2va_models.py
+export HF_ENDPOINT=https://hf-mirror.com
+hf download ByteDance/Sa2VA-1B --local-dir ./pretrained/Sa2VA-1B
 ```
 3. 在`./demo`下需要两个文件夹，`input`存放输入图片，`output`存放输出结果。
 4. 打开`./demo/demo_1B.py`文件，设置断点后，打开VSCode边栏，选择配置名，即可调试。
