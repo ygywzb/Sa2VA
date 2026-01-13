@@ -8,7 +8,7 @@
 uv sync --extra=latest
 source .venv/bin/activate
 ```
-2. 下载模型至`./demo/pretrained/Sa2VA-1B`下
+2. 下载模型至`./pretrained/Sa2VA-1B`下
 ```bash
 python ./demo/download_sa2va_models.py
 ```

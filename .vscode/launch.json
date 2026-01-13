@@ -11,7 +11,7 @@
             "program": "./demo/demo_1B.py",
             "args": [
                 "./demo/input",
-                "--model_path", "./demo/pretrained/Sa2VA-1B",
+                "--model_path", "./pretrained/Sa2VA-1B",
                 "--work-dir", "./demo/output",
                 "--text", "<image>Please describe the video content.",
                 "--select", "1"
@@ -30,7 +30,7 @@
             "program": "./demo/demo_1B.py",
             "args": [
                 "./demo/input",
-                "--model_path", "./demo/pretrained/Sa2VA-1B",
+                "--model_path", "./pretrained/Sa2VA-1B",
                 "--work-dir", "./demo/output",
                 "--text", "<image>Please segment the man in the video who is riding a motorcycle on a busy street.",
                 "--select", "1"
@@ -49,7 +49,7 @@
             "program": "./demo/demo_1B.py",
             "args": [
                 "./demo/input",
-                "--model_path", "./demo/pretrained/Sa2VA-1B",
+                "--model_path", "./pretrained/Sa2VA-1B",
                 "--work-dir", "./demo/output",
                 "--text", "<image>Please describe the video content.",
                 "--select", "2"
@@ -68,7 +68,7 @@
             "program": "./demo/demo_1B.py",
             "args": [
                 "./demo/input",
-                "--model_path", "./demo/pretrained/Sa2VA-1B",
+                "--model_path", "./pretrained/Sa2VA-1B",
                 "--work-dir", "./demo/output",
                 "--text", "<image>Please segment the grey cat in the video which stands next to a dog.",
                 "--select", "2"
