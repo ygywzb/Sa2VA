@@ -108,7 +108,8 @@ checkpoints/
 checkpoints
 data/
 data
-.vscode
+# for Sa2VA code debug
+# .vscode
 .idea
 .DS_Store
 *.pkl

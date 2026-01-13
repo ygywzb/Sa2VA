@@ -1,0 +1,24 @@
+{
+    // 使用 IntelliSense 了解相关属性。 
+    // 悬停以查看现有属性的描述。
+    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Sa2VA-in25-1B Train",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "tools/train.py",
+            "args": [
+                "projects/sa2va/configs/sa2va_in25_1b.py", 
+                "--deepspeed", "deepspeed_zero2"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}", // 必须要加，不然会找不到本地模块(如projects)
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300"
+            }
+        }
+    ]
+}

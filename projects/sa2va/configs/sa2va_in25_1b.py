@@ -23,8 +23,9 @@ from projects.sa2va.datasets.data_utils import ConcatDatasetSa2VA
 #                          PART 1  Settings                           #
 #######################################################################
 # Model
-# huggingface-cli download --local-dir-use-symlinks False --local-dir ./pretrained/internvl3/InternVL3-1B OpenGVLab/InternVL3-1B
-path = 'OpenGVLab/InternVL3-1B'
+# hf download OpenGVLab/InternVL2_5-1B --local-dir ./pretrained/InternVL2_5-1B
+# pretrained_pth为None就是从头训练
+path = './pretrained/InternVL2_5-1B'
 pretrained_pth = None
 
 # Data
