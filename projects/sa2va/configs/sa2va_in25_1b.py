@@ -11,7 +11,7 @@ from xtuner.utils import PROMPT_TEMPLATE
 from third_parts.mmdet.models.losses import DiceLoss, CrossEntropyLoss
 from peft import LoraConfig
 
-from projects.sa2va.models import Sa2VAModel, SAM2TrainRunner, DirectResize, InternVLMLLM
+from projects.sa2va.models import Sa2VAModel, SAM2TrainRunner, DirectResize, InternVLMLLM_Train
 from projects.sa2va.datasets import (
     sa2va_collect_fn, Sa2VA01RefSeg, LLaVADataset, 
     Sa2VA03RefVOS, Sa2VA04VideoQA, Sa2VA05GCGDataset, Sa2VA06VPDataset
@@ -73,7 +73,8 @@ model = dict(
     loss_sample_points=True,
     frozen_sam2_decoder=False,
     mllm=dict(
-        type=InternVLMLLM,
+        type=InternVLMLLM_Train,
+        use_flash_attn=False,
         model_path=path,
         freeze_llm=True,
         freeze_visual_encoder=True,
@@ -215,15 +216,16 @@ sa2va_data_03_refvos_configs = [
         dataset_type='refytvos',
         **sa2va_default_dataset_configs
     ),
-    dict(
-        type=Sa2VA03RefVOS,
-        name='Ref-SAV',
-        image_folder=VIDEO_DATA_ROOT + 'sam_v_full/',
-        expression_file=VIDEO_DATA_ROOT + 'Ref-SAV.json',
-        repeats=4,
-        dataset_type='refsav',
-        **sa2va_default_dataset_configs
-    )
+    # sa-v视频没下全，先不用
+    # dict(
+    #     type=Sa2VA03RefVOS,
+    #     name='Ref-SAV',
+    #     image_folder=VIDEO_DATA_ROOT + 'sam_v_full/',
+    #     expression_file=VIDEO_DATA_ROOT + 'Ref-SAV.json',
+    #     repeats=4,
+    #     dataset_type='refsav',
+    #     **sa2va_default_dataset_configs
+    # )
 ]
 
 ######################### VideoQA ##################################

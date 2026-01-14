@@ -14,7 +14,7 @@
                 "--deepspeed", "deepspeed_zero2"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
-            "justMyCode": false,
+            // "justMyCode": false,
             "env": {
                 "PYTHONPATH": "${workspaceFolder}", // 必须要加，不然会找不到本地模块(如projects)
                 "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300"

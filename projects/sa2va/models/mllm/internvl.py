@@ -9,6 +9,8 @@ from mmengine import print_log
 from vlm.utils import decode_tokens_with_counts
 
 
+# 使用use-flash-attn的参数被xtuner的这个父类写死了
+# 接下来要写一个继承这个父类的类改写构造方法，然后让这个类去继承我改构造的子类
 class InternVLMLLM(InternVL_V1_5):
     def __init__(self,
                  model_path: str,
