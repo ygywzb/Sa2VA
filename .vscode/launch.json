@@ -19,6 +19,23 @@
                 "PYTHONPATH": "${workspaceFolder}", // 必须要加，不然会找不到本地模块(如projects)
                 "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300"
             }
+        },
+        {
+            "name": "convert to pth(in25_1b)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "tools/convert_to_pth.py",
+            "args": [
+                "./pretrained/Sa2VA-1B", 
+                "--save-path", "./pretrained/Sa2VA_pth/model_in25_1b.pth",
+                "--arch-type", "internvl"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            // "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}", // 必须要加，不然会找不到本地模块(如projects)
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300"
+            }
         }
     ]
 }

@@ -24,9 +24,9 @@ from projects.sa2va.datasets.data_utils import ConcatDatasetSa2VA
 #######################################################################
 # Model
 # hf download OpenGVLab/InternVL2_5-1B --local-dir ./pretrained/InternVL2_5-1B
-# pretrained_pth为None就是从头训练
+# pretrained_pth：微调用，需要下载hf格式，然后用自带tools/convert_to_pth.py转换得到
 path = './pretrained/InternVL2_5-1B'
-pretrained_pth = None
+pretrained_pth = './pretrained/Sa2VA_pth/model_in25_1b.pth'
 
 # Data
 template = "qwen_chat"
