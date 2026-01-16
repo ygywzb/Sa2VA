@@ -5,12 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Sa2VA-in25-1B Train",
+            "name": "Sa2VA-in25-1B Train(Debug)",
             "type": "debugpy",
             "request": "launch",
             "program": "tools/train.py",
             "args": [
-                "projects/sa2va/configs/sa2va_in25_1b.py", 
+                "projects/sa2va/configs/sa2va_in25_1b_debug.py", 
                 "--deepspeed", "deepspeed_zero2"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
