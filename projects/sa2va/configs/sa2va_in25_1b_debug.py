@@ -221,6 +221,7 @@ sa2va_data_03_refvos_configs = [
     #     **sa2va_default_dataset_configs
     # ),
     # sa-v视频没下全，先不用
+    # 下载全了就可以正常读取
     # dict(
     #     type=Sa2VA03RefVOS,
     #     name='Ref-SAV',
