@@ -21,6 +21,22 @@
             }
         },
         {
+            "name": "Sa2VA-in25-1B Train(Dev)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "tools/train.py",
+            "args": [
+                "projects/sa2va/configs/sa2va_in25_1b_dev.py", 
+                "--deepspeed", "deepspeed_zero2"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            // "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}", // 必须要加，不然会找不到本地模块(如projects)
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300"
+            }
+        },
+        {
             "name": "convert to pth(in25_1b)",
             "type": "debugpy",
             "request": "launch",
