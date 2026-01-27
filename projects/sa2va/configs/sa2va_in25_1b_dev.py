@@ -1,7 +1,12 @@
 # only for debug
 # 保持每种数据集都有的情况下，每种只保留一个数据集，且repeat全为1
-from mmengine.hooks import (CheckpointHook, DistSamplerSeedHook, IterTimerHook,
-                            LoggerHook, ParamSchedulerHook)
+from mmengine.hooks import (
+    CheckpointHook,
+    DistSamplerSeedHook,
+    IterTimerHook,
+    LoggerHook,
+    ParamSchedulerHook,
+)
 from mmengine.optim import AmpOptimWrapper, CosineAnnealingLR, LinearLR
 from torch.optim import AdamW
 from transformers import AutoTokenizer
@@ -13,10 +18,21 @@ from xtuner.utils import PROMPT_TEMPLATE
 from third_parts.mmdet.models.losses import DiceLoss, CrossEntropyLoss
 from peft import LoraConfig
 
-from projects.sa2va.models import Sa2VAModel, SAM2TrainRunner, DirectResize, InternVLMLLM_Train
+from projects.sa2va.models.compression_method import TransformerScorer
+from projects.sa2va.models import (
+    Sa2VAModelDev,
+    SAM2TrainRunner,
+    DirectResize,
+    InternVLMLLM_Train_Dev,
+)
 from projects.sa2va.datasets import (
-    sa2va_collect_fn, Sa2VA01RefSeg, LLaVADataset, 
-    Sa2VA03RefVOS, Sa2VA04VideoQA, Sa2VA05GCGDataset, Sa2VA06VPDataset
+    sa2va_collect_fn,
+    Sa2VA01RefSeg,
+    LLaVADataset,
+    Sa2VA03RefVOS,
+    Sa2VA04VideoQA,
+    Sa2VA05GCGDataset,
+    Sa2VA06VPDataset,
 )
 
 from projects.sa2va.datasets.data_utils import ConcatDatasetSa2VA
@@ -27,8 +43,8 @@ from projects.sa2va.datasets.data_utils import ConcatDatasetSa2VA
 # Model
 # hf download OpenGVLab/InternVL2_5-1B --local-dir ./pretrained/InternVL2_5-1B
 # pretrained_pth：微调用，需要下载hf格式，然后用自带tools/convert_to_pth.py转换得到
-path = './pretrained/InternVL2_5-1B'
-pretrained_pth = './pretrained/Sa2VA_pth/model_in25_1b.pth'
+path = "./pretrained/InternVL2_5-1B"
+pretrained_pth = "./pretrained/Sa2VA_pth/model_in25_1b.pth"
 
 # Data
 template = "qwen_chat"
@@ -37,7 +53,7 @@ max_length = 8192
 
 # Scheduler & Optimizer
 batch_size = 2  # per_device
-accumulative_counts = 4 # on 16 gpus
+accumulative_counts = 4  # on 16 gpus
 dataloader_num_workers = 8
 max_epochs = 1
 optim_type = AdamW
@@ -52,13 +68,14 @@ warmup_ratio = 0.05
 save_steps = 2000
 save_total_limit = 2  # Maximum checkpoints to keep (-1 means unlimited)
 
-special_tokens = ['[SEG]', '<p>', '</p>', '<vp>', '</vp>']
+special_tokens = ["[SEG]", "<p>", "</p>", "<vp>", "</vp>"]
 
 tokenizer = dict(
     type=AutoTokenizer.from_pretrained,
     pretrained_model_name_or_path=path,
     trust_remote_code=True,
-    padding_side='right')
+    padding_side="right",
+)
 
 extra_image_processor = dict(
     type=DirectResize,
@@ -68,14 +85,14 @@ extra_image_processor = dict(
 #            PART 2  Model & Tokenizer & Image Processor              #
 #######################################################################
 model = dict(
-    type=Sa2VAModel,
+    type=Sa2VAModelDev,
     training_bs=batch_size,
     special_tokens=special_tokens,
     pretrained_pth=pretrained_pth,
     loss_sample_points=True,
     frozen_sam2_decoder=False,
     mllm=dict(
-        type=InternVLMLLM_Train,
+        type=InternVLMLLM_Train_Dev,
         use_flash_attn=False,
         model_path=path,
         freeze_llm=True,
@@ -85,39 +102,46 @@ model = dict(
             r=128,
             lora_alpha=256,
             lora_dropout=0.05,
-            bias='none',
-            task_type='CAUSAL_LM',
-            modules_to_save=["embed_tokens", "lm_head"]
+            bias="none",
+            task_type="CAUSAL_LM",
+            modules_to_save=["embed_tokens", "lm_head"],
         ),
+        # 896维，中间已经映射到了llm的维度
+        # 其他参数默认
+        importance_scorer=dict(
+            type=TransformerScorer,
+            in_features=896,
+        ),
+        # 预算，只拿30%的最重要特征
+        budgets=0.3,
     ),
     tokenizer=tokenizer,
     grounding_encoder=dict(
         type=SAM2TrainRunner,
     ),
     loss_mask=dict(
-        type=CrossEntropyLoss,
-        use_sigmoid=True,
-        reduction='mean',
-        loss_weight=2.0),
+        type=CrossEntropyLoss, use_sigmoid=True, reduction="mean", loss_weight=2.0
+    ),
     loss_dice=dict(
         type=DiceLoss,
         use_sigmoid=True,
         activate=True,
-        reduction='mean',
+        reduction="mean",
         naive_dice=True,
         eps=1.0,
-        loss_weight=0.5)
+        loss_weight=0.5,
+    ),
 )
 
 #######################################################################
 #                      PART 3  Dataset & Dataloader                   #
 #######################################################################
 
-DATA_ROOT = './data/'
-VIDEO_DATA_ROOT = DATA_ROOT + 'video_datas/'
+DATA_ROOT = "./data/"
+VIDEO_DATA_ROOT = DATA_ROOT + "video_datas/"
 
 # this is for datasets with masks
-sa2va_default_dataset_configs=dict(
+sa2va_default_dataset_configs = dict(
     tokenizer=tokenizer,
     special_tokens=special_tokens,
     extra_image_processor=extra_image_processor,
@@ -126,7 +150,7 @@ sa2va_default_dataset_configs=dict(
 )
 
 # this is for datasets without masks
-sa2va_qa_default_dataset_configs=dict(
+sa2va_qa_default_dataset_configs = dict(
     tokenizer=tokenizer,
     special_tokens=special_tokens,
     prompt_template=prompt_template,
@@ -134,15 +158,15 @@ sa2va_qa_default_dataset_configs=dict(
 )
 
 ######################### ImageRefSeg ##################################
-RES_ROOT = DATA_ROOT + 'ref_seg/'
+RES_ROOT = DATA_ROOT + "ref_seg/"
 sa2va_data_01_refseg_configs = [
     dict(
         type=Sa2VA01RefSeg,
-        name='RefCOCO',
-        data_root=RES_ROOT + 'refcoco',
-        data_prefix=dict(img_path='coco2014/train2014/'),
-        ann_file='instances.json',
-        split_file='refs(unc).p',
+        name="RefCOCO",
+        data_root=RES_ROOT + "refcoco",
+        data_prefix=dict(img_path="coco2014/train2014/"),
+        ann_file="instances.json",
+        split_file="refs(unc).p",
         num_classes_per_sample=5,
         # repeats=5,
         repeats=1,
@@ -174,13 +198,13 @@ sa2va_data_01_refseg_configs = [
 
 
 ######################### ImageQA ##################################
-LLAVA_ROOT = DATA_ROOT + 'llava_data/'
+LLAVA_ROOT = DATA_ROOT + "llava_data/"
 sa2va_data_02_imageqa_configs = [
     dict(
         type=LLaVADataset,
-        name='llava_665k',
-        data_path=LLAVA_ROOT + 'LLaVA-Instruct-150K/llava_v1_5_mix665k.json',
-        image_folder=LLAVA_ROOT + 'llava_images/',
+        name="llava_665k",
+        data_path=LLAVA_ROOT + "LLaVA-Instruct-150K/llava_v1_5_mix665k.json",
+        image_folder=LLAVA_ROOT + "llava_images/",
         skip_pure_text=False,
         repeats=1,
         **sa2va_qa_default_dataset_configs,
@@ -191,14 +215,14 @@ sa2va_data_02_imageqa_configs = [
 sa2va_data_03_refvos_configs = [
     dict(
         type=Sa2VA03RefVOS,
-        name='ReVOS',
-        image_folder=VIDEO_DATA_ROOT + 'revos/',
-        expression_file=VIDEO_DATA_ROOT + 'revos/' + 'meta_expressions_train_.json',
-        mask_file=VIDEO_DATA_ROOT + 'revos/' + 'mask_dict.json',
+        name="ReVOS",
+        image_folder=VIDEO_DATA_ROOT + "revos/",
+        expression_file=VIDEO_DATA_ROOT + "revos/" + "meta_expressions_train_.json",
+        mask_file=VIDEO_DATA_ROOT + "revos/" + "mask_dict.json",
         # repeats=10,
         repeats=1,
-        dataset_type='default',
-        **sa2va_default_dataset_configs
+        dataset_type="default",
+        **sa2va_default_dataset_configs,
     ),
     # dict(
     #     type=Sa2VA03RefVOS,
@@ -237,9 +261,9 @@ sa2va_data_03_refvos_configs = [
 sa2va_data_04_videoqa_configs = [
     dict(
         type=Sa2VA04VideoQA,
-        name='VideoQA',
-        image_folder=VIDEO_DATA_ROOT + 'chat_univi/Activity_Videos/',
-        json_file=VIDEO_DATA_ROOT + 'chat_univi/video_chat.json',
+        name="VideoQA",
+        image_folder=VIDEO_DATA_ROOT + "chat_univi/Activity_Videos/",
+        json_file=VIDEO_DATA_ROOT + "chat_univi/video_chat.json",
         sampled_frames=5,
         repeats=1,
         **sa2va_qa_default_dataset_configs,
@@ -259,13 +283,13 @@ sa2va_data_05_gcg_configs = [
     # ),
     dict(
         type=Sa2VA05GCGDataset,
-        name='GCG_02_GranDf',
-        image_folder=DATA_ROOT + 'glamm_data/images/grandf/train/',
-        data_path=DATA_ROOT + 'glamm_data/annotations/GranDf_HA_GCG_train.json',
-        dataset_type='grandf',
+        name="GCG_02_GranDf",
+        image_folder=DATA_ROOT + "glamm_data/images/grandf/train/",
+        data_path=DATA_ROOT + "glamm_data/annotations/GranDf_HA_GCG_train.json",
+        dataset_type="grandf",
         # repeats=50,
         repeats=1,
-        **sa2va_default_dataset_configs
+        **sa2va_default_dataset_configs,
     ),
     # dict(
     #     type=Sa2VA05GCGDataset,
@@ -290,39 +314,40 @@ sa2va_data_05_gcg_configs = [
 
 ######################### VP ##################################
 data_osprey_image_folders = [
-    DATA_ROOT + 'osprey-724k/coco/train2014/',
-    DATA_ROOT + 'osprey-724k/coco/val2014/',
-    DATA_ROOT + 'osprey-724k/coco/train2017/',
-    DATA_ROOT + 'osprey-724k/coco/val2017/',
+    DATA_ROOT + "osprey-724k/coco/train2014/",
+    DATA_ROOT + "osprey-724k/coco/val2014/",
+    DATA_ROOT + "osprey-724k/coco/train2017/",
+    DATA_ROOT + "osprey-724k/coco/val2017/",
 ]
 sa2va_data_06_vp_configs = [
     dict(
         type=Sa2VA06VPDataset,
-        name='Osprey_01_conv',
-        dataset_type='conversation',
+        name="Osprey_01_conv",
+        dataset_type="conversation",
         image_folder=data_osprey_image_folders,
-        data_path=DATA_ROOT + 'osprey-724k/Osprey-724K/osprey_conversation.json',
-        **sa2va_qa_default_dataset_configs
+        data_path=DATA_ROOT + "osprey-724k/Osprey-724K/osprey_conversation.json",
+        **sa2va_qa_default_dataset_configs,
     ),
     dict(
         type=Sa2VA06VPDataset,
-        name='Osprey_02_description',
-        dataset_type='description',
+        name="Osprey_02_description",
+        dataset_type="description",
         image_folder=data_osprey_image_folders,
-        data_path=DATA_ROOT + 'osprey-724k/Osprey-724K/osprey_detail_description.json',
-        **sa2va_qa_default_dataset_configs
-    )
+        data_path=DATA_ROOT + "osprey-724k/Osprey-724K/osprey_detail_description.json",
+        **sa2va_qa_default_dataset_configs,
+    ),
 ]
 
 train_dataset = dict(
-    type=ConcatDatasetSa2VA, datasets=[
+    type=ConcatDatasetSa2VA,
+    datasets=[
         *sa2va_data_01_refseg_configs,
         *sa2va_data_02_imageqa_configs,
         *sa2va_data_03_refvos_configs,
         *sa2va_data_04_videoqa_configs,
         *sa2va_data_05_gcg_configs,
-        *sa2va_data_06_vp_configs
-    ]
+        *sa2va_data_06_vp_configs,
+    ],
 )
 train_dataloader = dict(
     batch_size=batch_size,
@@ -330,9 +355,10 @@ train_dataloader = dict(
     dataset=train_dataset,
     sampler=dict(
         type=LengthGroupedSampler,
-        length_property='modality_length',
-        per_device_batch_size=batch_size * accumulative_counts),
-    collate_fn=dict(type=sa2va_collect_fn)
+        length_property="modality_length",
+        per_device_batch_size=batch_size * accumulative_counts,
+    ),
+    collate_fn=dict(type=sa2va_collect_fn),
 )
 
 #######################################################################
@@ -341,12 +367,11 @@ train_dataloader = dict(
 # optimizer
 optim_wrapper = dict(
     type=AmpOptimWrapper,
-    optimizer=dict(
-        type=optim_type, lr=lr, betas=betas, weight_decay=weight_decay),
+    optimizer=dict(type=optim_type, lr=lr, betas=betas, weight_decay=weight_decay),
     clip_grad=dict(max_norm=max_norm, error_if_nonfinite=False),
     accumulative_counts=accumulative_counts,
-    loss_scale='dynamic',
-    dtype='bfloat16'
+    loss_scale="dynamic",
+    dtype="bfloat16",
 )
 
 # learning policy
@@ -358,14 +383,16 @@ param_scheduler = [
         by_epoch=True,
         begin=0,
         end=warmup_ratio * max_epochs,
-        convert_to_iter_based=True),
+        convert_to_iter_based=True,
+    ),
     dict(
         type=CosineAnnealingLR,
         eta_min=0.0,
         by_epoch=True,
         begin=warmup_ratio * max_epochs,
         end=max_epochs,
-        convert_to_iter_based=True)
+        convert_to_iter_based=True,
+    ),
 ]
 
 # train, val, test setting
@@ -393,7 +420,8 @@ default_hooks = dict(
         save_optimizer=False,
         by_epoch=False,
         interval=save_steps,
-        max_keep_ckpts=save_total_limit),
+        max_keep_ckpts=save_total_limit,
+    ),
     # set sampler seed in distributed evrionment.
     sampler_seed=dict(type=DistSamplerSeedHook),
 )
@@ -403,16 +431,16 @@ env_cfg = dict(
     # whether to enable cudnn benchmark
     cudnn_benchmark=False,
     # set multi process parameters
-    mp_cfg=dict(mp_start_method='fork', opencv_num_threads=0),
+    mp_cfg=dict(mp_start_method="fork", opencv_num_threads=0),
     # set distributed parameters
-    dist_cfg=dict(backend='nccl'),
+    dist_cfg=dict(backend="nccl"),
 )
 
 # set visualizer
 visualizer = None
 
 # set log level
-log_level = 'INFO'
+log_level = "INFO"
 
 # load from which checkpoint
 load_from = None
