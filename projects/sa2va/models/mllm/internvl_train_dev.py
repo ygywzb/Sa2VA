@@ -2,6 +2,7 @@ from projects.sa2va.models.mllm.internvl_train import InternVLMLLM_Train
 from projects.sa2va.models.compression_method import TransformerScorer, topk
 
 import torch
+import torch.nn.functional as F
 import torch.distributed
 from xtuner.model import InternVL_V1_5
 from typing import List, Optional, Tuple, Union
@@ -122,8 +123,9 @@ class InternVLMLLM_Train_Dev(InternVLMLLM_Train):
             constraint_img_mask.scatter_(
                 dim=-1, index=constraint_topk_indices, value=1.0
             )
-        # 当前暂时先不返回软掩膜和硬掩模
-        visual_embeds, _, _ = hidden_states_new, img_mask, constraint_img_mask
+        # 计算出打分损失
+        scorer_loss = F.binary_cross_entropy(img_mask, constraint_img_mask)
+        visual_embeds = hidden_states_new
         # --------创新代码结束-----------
 
         # Embed visual features into text embeddings
@@ -154,10 +156,22 @@ class InternVLMLLM_Train_Dev(InternVLMLLM_Train):
             output = (outputs.logits,) + outputs[1:]
             return (loss,) + output if loss is not None else output
 
-        return CausalLMOutputWithPast(
+        return CausalLMOutputWithPastDev(
+            # llm的损失
             loss=loss,
             logits=outputs.logits,
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
+            # ADD
+            scorer_loss=scorer_loss,
         )
+
+
+from dataclasses import dataclass
+
+
+@dataclass
+class CausalLMOutputWithPastDev(CausalLMOutputWithPast):
+    # 打分损失
+    scorer_loss: Optional[torch.FloatTensor] = None
