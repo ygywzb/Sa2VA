@@ -61,7 +61,7 @@ class Sa2VAModelDev(Sa2VAModel):
             arch_type,
             training_bs,
         )
-        self.regularization_weight = None
+        self.regularization_weight: float = None
 
     def forward(self, data, data_samples=None, mode="loss"):
         assert (
@@ -178,10 +178,16 @@ class Sa2VAModelDev(Sa2VAModel):
         loss_mask = loss_mask * _scale
         loss_dice = loss_dice * _scale
 
+        # 乘上动态权重的打分器损失
+        weighted_scorer_loss = self.regularization_weight * output.scorer_loss
+
         loss_dict = {
+            # upstream task
             "loss_mask": loss_mask,
             "loss_dice": loss_dice,
             "llm_loss": output.loss,
+            # added
+            "scorer_loss": weighted_scorer_loss,
         }
         return loss_dict
 
