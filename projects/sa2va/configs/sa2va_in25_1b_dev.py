@@ -18,7 +18,10 @@ from xtuner.utils import PROMPT_TEMPLATE
 from third_parts.mmdet.models.losses import DiceLoss, CrossEntropyLoss
 from peft import LoraConfig
 
-from projects.sa2va.models.compression_method import TransformerScorer
+from projects.sa2va.models.compression_method import (
+    TransformerScorer,
+    ScheduledWeightHook,
+)
 from projects.sa2va.models import (
     Sa2VAModelDev,
     SAM2TrainRunner,
@@ -403,7 +406,7 @@ train_cfg = dict(type=TrainLoop, max_epochs=max_epochs)
 #######################################################################
 # Log the dialogue periodically during the training process, optional
 custom_hooks = [
-    # dict(type=DatasetInfoHook, tokenizer=tokenizer),
+    dict(type=ScheduledWeightHook, log_interval=1),
 ]
 
 # configure default hooks
