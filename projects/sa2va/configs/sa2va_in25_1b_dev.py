@@ -345,11 +345,11 @@ train_dataset = dict(
     type=ConcatDatasetSa2VA,
     datasets=[
         *sa2va_data_01_refseg_configs,
-        *sa2va_data_02_imageqa_configs,
+        # *sa2va_data_02_imageqa_configs,
         *sa2va_data_03_refvos_configs,
-        *sa2va_data_04_videoqa_configs,
-        *sa2va_data_05_gcg_configs,
-        *sa2va_data_06_vp_configs,
+        # *sa2va_data_04_videoqa_configs,
+        # *sa2va_data_05_gcg_configs,
+        # *sa2va_data_06_vp_configs,
     ],
 )
 train_dataloader = dict(
@@ -406,7 +406,7 @@ train_cfg = dict(type=TrainLoop, max_epochs=max_epochs)
 #######################################################################
 # Log the dialogue periodically during the training process, optional
 custom_hooks = [
-    dict(type=ScheduledWeightHook, log_interval=1),
+    dict(type=ScheduledWeightHook, log_interval=10),
 ]
 
 # configure default hooks
