@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "sa2va demo(1B)_VQA_1",
+            "name": "sa2va demo(1B)_VQA",
             "type": "debugpy",
             "request": "launch",
             "program": "./demo/demo_1B.py",
@@ -20,11 +20,12 @@
             "console": "integratedTerminal",
             // "justMyCode": false,
             "env": {
-                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300"
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300",
+                "CUDA_VISIBLE_DEVICES": "1",
             }
         },
         {
-            "name": "sa2va demo(1B)_REF_SEG_1",
+            "name": "sa2va demo(1B)_REF_SEG",
             "type": "debugpy",
             "request": "launch",
             "program": "./demo/demo_1B.py",
@@ -39,46 +40,51 @@
             "console": "integratedTerminal",
             // "justMyCode": false,
             "env": {
-                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300"
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300",
+                "CUDA_VISIBLE_DEVICES": "1",
+
             }
         },
         {
-            "name": "sa2va demo(1B)_VQA_2",
+            "name": "sa2va demo(1B)_VQA_Single",
             "type": "debugpy",
             "request": "launch",
             "program": "./demo/demo_1B.py",
             "args": [
-                "./demo/input",
+                // "./demo/input",
                 "--model_path", "./pretrained/Sa2VA-1B",
                 "--work-dir", "./demo/output",
                 "--text", "<image>Please describe the video content.",
-                "--select", "2"
+                "--single_image", "./demo/input/img1.png",
             ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             // "justMyCode": false,
             "env": {
-                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300"
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300",
+                "CUDA_VISIBLE_DEVICES": "1",
             }
         },
         {
-            "name": "sa2va demo(1B)_REF_SEG_2",
+            "name": "sa2va demo(1B)_REF_SEG_Single",
             "type": "debugpy",
             "request": "launch",
             "program": "./demo/demo_1B.py",
             "args": [
-                "./demo/input",
+                // "./demo/input",
                 "--model_path", "./pretrained/Sa2VA-1B",
                 "--work-dir", "./demo/output",
-                "--text", "<image>Please segment the grey cat in the video which stands next to a dog.",
-                "--select", "2"
+                "--text", "<image>Please segment the man in the video who is riding a motorcycle on a busy street.",
+                "--single_image", "./demo/input/img1.png",
             ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             // "justMyCode": false,
             "env": {
-                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300"
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300",
+                "CUDA_VISIBLE_DEVICES": "1",
+
             }
-        }
+        },
     ]
 }
