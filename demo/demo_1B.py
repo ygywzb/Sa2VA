@@ -201,5 +201,8 @@ if __name__ == "__main__":
             else:
                 os.makedirs("./temp_visualize_results", exist_ok=True)
                 visualize(pred_mask, image_paths[frame_idx], "./temp_visualize_results")
+        print(
+            f"Segmentation visualization has been saved to {cfg.work_dir if cfg.work_dir else './temp_visualize_results'}."
+        )
     else:
         pass

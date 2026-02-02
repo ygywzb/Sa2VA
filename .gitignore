@@ -150,4 +150,4 @@ quick_test_output/
 projects/sa2va/tests/*
 
 # demo
-demo/output/*.png
+demo/output/
