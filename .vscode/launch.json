@@ -55,6 +55,25 @@
                 "PYTHONPATH": "${workspaceFolder}", // 必须要加，不然会找不到本地模块(如projects)
                 "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300"
             }
+        },
+        {
+            "name": "convert to hf(in25_1b)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "tools/convert_to_hf.py",
+            "args": [
+                "projects/sa2va/configs/sa2va_in25_1b_dev_debug.py", 
+                "work_dirs/sa2va_in25_1b_dev_debug/iter_436.pth",
+                "--save-path", "pretrained/sa2va-dev-models/Sa2VA-1B"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            // "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}", // 必须要加，不然会找不到本地模块(如projects)
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300",
+                "CUDA_PATH": "/usr/local/cuda-12.4", // 除非环境有全局CUDA_PATH变量，否则必须提供，导包过程需要
+                "CUDA_VISIBLE_DEVICES": "0", // 训练指定可见GPU
+            }
         }
     ]
 }
