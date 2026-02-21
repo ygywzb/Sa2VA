@@ -9,6 +9,7 @@ from typing import List, Optional, Tuple, Union
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from torch.nn import CrossEntropyLoss
 from mmengine import print_log
+from mmengine.model import BaseModel
 from xtuner.registry import BUILDER
 
 
@@ -48,6 +49,16 @@ class InternVLMLLM_Train_Dev(InternVLMLLM_Train):
         )
         self.model.importance_scorer = BUILDER.build(importance_scorer)
         self.budgets = budgets
+
+    # 重写state_dict方法，添加打分器的参数
+    def state_dict(self, *args, **kwargs):
+        to_return = super().state_dict(*args, **kwargs)
+        # 保留scorer的参数
+        scorer_dict = self.model.importance_scorer.state_dict()
+        to_return.update(
+            {"mllm.model.importance_scorer." + k: v for k, v in scorer_dict.items()}
+        )
+        return to_return
 
     def _llm_forward(
         self,

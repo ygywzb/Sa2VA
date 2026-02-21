@@ -64,6 +64,8 @@ class Sa2VAModelDev(Sa2VAModel):
         self.regularization_weight: float = None
 
     def forward(self, data, data_samples=None, mode="loss"):
+        state_dict = self.state_dict()
+
         assert (
             self.regularization_weight is not None
         ), "regularization_weight must be modified by hook before iteration."
@@ -190,17 +192,5 @@ class Sa2VAModelDev(Sa2VAModel):
             "scorer_loss": weighted_scorer_loss,
         }
         return loss_dict
-
-    # 这个就是原生的state_dict方法，保存了所有参数，包括冻结的参数
-    def all_state_dict(self, *args, **kwargs):
-        state_dict = super().all_state_dict(*args, **kwargs)
-        return state_dict
-
-    # 基线已经把重写了此方法，使得pth文件只保存必要的参数，冻结的参数如llm直接通过现成的模型导入
-    # 这也就是输出的pth文件体积远小于原模型的原因，2GB -> 70MB
-    def state_dict(self, *args, **kwargs):
-        to_return = super().state_dict(*args, **kwargs)
-        # to_return.update(xxx)
-        return to_return
 
     pass
