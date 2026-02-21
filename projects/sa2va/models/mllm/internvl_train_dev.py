@@ -28,8 +28,8 @@ class InternVLMLLM_Train_Dev(InternVLMLLM_Train):
         pretrained_pth: Optional[str] = None,
         use_flash_attn: bool = True,
         # ------ADD------
-        # 随着上层mllm的BUILD自动装配
-        importance_scorer: TransformerScorer = None,
+        # 用mmengine的BUILD自动装配
+        importance_scorer: Optional[dict] = None,
         budgets: float = None,
     ):
         assert importance_scorer is not None, "importance_scorer should not be none."
@@ -46,7 +46,7 @@ class InternVLMLLM_Train_Dev(InternVLMLLM_Train):
             pretrained_pth,
             use_flash_attn,
         )
-        self.importance_scorer = BUILDER.build(importance_scorer)
+        self.model.importance_scorer = BUILDER.build(importance_scorer)
         self.budgets = budgets
 
     def _llm_forward(
@@ -105,7 +105,9 @@ class InternVLMLLM_Train_Dev(InternVLMLLM_Train):
         # -------创新代码加在这里------
         hidden_states = visual_embeds
         hidden_states_unsqueezed = hidden_states.unsqueeze(0)
-        learned_scores = self.importance_scorer(hidden_states_unsqueezed).squeeze(0)
+        learned_scores = self.model.importance_scorer(hidden_states_unsqueezed).squeeze(
+            0
+        )
         total_tokens = learned_scores.shape[0]
         k = int(total_tokens * self.budgets)
         img_mask = topk(learned_scores.unsqueeze(0), k).squeeze(0)

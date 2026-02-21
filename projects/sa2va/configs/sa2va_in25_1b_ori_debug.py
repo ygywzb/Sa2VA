@@ -1,4 +1,5 @@
 # only for debug
+# Sa2VA基线代码的debug
 # 保持每种数据集都有的情况下，每种只保留一个数据集，且repeat全为1
 from mmengine.hooks import (
     CheckpointHook,
@@ -18,15 +19,11 @@ from xtuner.utils import PROMPT_TEMPLATE
 from third_parts.mmdet.models.losses import DiceLoss, CrossEntropyLoss
 from peft import LoraConfig
 
-from projects.sa2va.models.compression_method import (
-    TransformerScorer,
-    ScheduledWeightHook,
-)
 from projects.sa2va.models import (
-    Sa2VAModelDev,
+    Sa2VAModel,
     SAM2TrainRunner,
     DirectResize,
-    InternVLMLLM_Train_Dev,
+    InternVLMLLM_Train,
 )
 from projects.sa2va.datasets import (
     sa2va_collect_fn,
@@ -88,14 +85,14 @@ extra_image_processor = dict(
 #            PART 2  Model & Tokenizer & Image Processor              #
 #######################################################################
 model = dict(
-    type=Sa2VAModelDev,
+    type=Sa2VAModel,
     training_bs=batch_size,
     special_tokens=special_tokens,
     pretrained_pth=pretrained_pth,
     loss_sample_points=True,
     frozen_sam2_decoder=False,
     mllm=dict(
-        type=InternVLMLLM_Train_Dev,
+        type=InternVLMLLM_Train,
         use_flash_attn=False,
         model_path=path,
         freeze_llm=True,
@@ -109,14 +106,6 @@ model = dict(
             task_type="CAUSAL_LM",
             modules_to_save=["embed_tokens", "lm_head"],
         ),
-        # 896维，中间已经映射到了llm的维度
-        # 其他参数默认
-        importance_scorer=dict(
-            type=TransformerScorer,
-            in_features=896,
-        ),
-        # 预算，只拿30%的最重要特征
-        budgets=0.3,
     ),
     tokenizer=tokenizer,
     grounding_encoder=dict(
@@ -345,11 +334,11 @@ train_dataset = dict(
     type=ConcatDatasetSa2VA,
     datasets=[
         *sa2va_data_01_refseg_configs,
-        # *sa2va_data_02_imageqa_configs,
+        *sa2va_data_02_imageqa_configs,
         *sa2va_data_03_refvos_configs,
-        # *sa2va_data_04_videoqa_configs,
-        # *sa2va_data_05_gcg_configs,
-        # *sa2va_data_06_vp_configs,
+        *sa2va_data_04_videoqa_configs,
+        *sa2va_data_05_gcg_configs,
+        *sa2va_data_06_vp_configs,
     ],
 )
 train_dataloader = dict(
@@ -406,7 +395,7 @@ train_cfg = dict(type=TrainLoop, max_epochs=max_epochs)
 #######################################################################
 # Log the dialogue periodically during the training process, optional
 custom_hooks = [
-    dict(type=ScheduledWeightHook, log_interval=10),
+    # dict(type=DatasetInfoHook, tokenizer=tokenizer),
 ]
 
 # configure default hooks
