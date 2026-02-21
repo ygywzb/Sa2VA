@@ -193,7 +193,7 @@ class Sa2VAModelDev(Sa2VAModel):
 
     # 这个就是原生的state_dict方法，保存了所有参数，包括冻结的参数
     def all_state_dict(self, *args, **kwargs):
-        state_dict = super().state_dict(*args, **kwargs)
+        state_dict = super().all_state_dict(*args, **kwargs)
         return state_dict
 
     # 基线已经把重写了此方法，使得pth文件只保存必要的参数，冻结的参数如llm直接通过现成的模型导入
