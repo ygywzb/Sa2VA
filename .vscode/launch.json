@@ -63,11 +63,11 @@
             "program": "tools/convert_to_hf.py",
             "args": [
                 "projects/sa2va/configs/sa2va_in25_1b_dev_debug.py", 
-                "work_dirs/sa2va_in25_1b_dev_debug/iter_436.pth",
+                "work_dirs/sa2va_in25_1b_dev_debug/iter_2560.pth",
                 "--save-path", "pretrained/sa2va-dev-models/Sa2VA-1B"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
-            // "justMyCode": false,
+            "justMyCode": false,
             "env": {
                 "PYTHONPATH": "${workspaceFolder}", // 必须要加，不然会找不到本地模块(如projects)
                 "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300",
