@@ -57,10 +57,10 @@
             }
         },
         {
-            "name": "convert to hf(in25_1b)",
+            "name": "convert to hf dev(in25_1b)",
             "type": "debugpy",
             "request": "launch",
-            "program": "tools/convert_to_hf.py",
+            "program": "tools/convert_to_hf_dev.py",
             "args": [
                 "projects/sa2va/configs/sa2va_in25_1b_dev_debug.py", 
                 "work_dirs/sa2va_in25_1b_dev_debug/iter_2560.pth",

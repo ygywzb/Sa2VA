@@ -83,6 +83,9 @@ def main():
     from projects.sa2va.hf.models.configuration_sa2va_chat import Sa2VAChatConfig
     from projects.sa2va.hf.models.modeling_sa2va_chat import Sa2VAChatModel
 
+    # for dev
+    from projects.sa2va.hf.models.configuration_sa2va_dev_chat import Sa2VADevChatConfig
+
     if "qwen3" in cfg.path.lower():
         from projects.sa2va.hf.models_qwen3vl.configuration_sa2va_chat import (
             Sa2VAChatConfigQwen,
@@ -103,7 +106,9 @@ def main():
     print(cfg.model)
 
     if "qwen" not in arch_type:
-        config = Sa2VAChatConfig.from_pretrained(cfg.path)
+        # 用的直接就是MLLM里的config
+        # config = Sa2VAChatConfig.from_pretrained(cfg.path)
+        config = Sa2VADevChatConfig.from_pretrained(cfg.path)
     else:
         config = Sa2VAChatConfigQwen.from_pretrained(cfg.path)
 
@@ -126,6 +131,14 @@ def main():
         template_str = system_prompt_pattern.sub("", template_str)
 
     config_dict["template"] = template_str
+
+    # LIS budgets
+    if "qwen" in arch_type:
+        raise NotImplementedError(
+            "Budget parameter is not implemented for Qwen models."
+        )
+    else:
+        config_dict["budgets"] = model.mllm.budgets
 
     if "qwen" in arch_type:
         # for qwen
@@ -156,20 +169,29 @@ def main():
                 new_key = new_key.replace(_text, name_map[_text])
             all_state_dict_new[new_key] = all_state_dict[key]
 
+        # check LIS dict
+        assert any(
+            key.startswith("importance_scorer") for key in all_state_dict_new.keys()
+        ), "No importance_scorer keys found in the state dict"
+
         config_dict["auto_map"] = {
             "AutoConfig": "configuration_sa2va_chat.Sa2VAChatConfig",
             "AutoModel": "modeling_sa2va_chat.Sa2VAChatModel",
             "AutoModelForCausalLM": "modeling_sa2va_chat.Sa2VAChatModel",
         }
 
-        sa2va_hf_config = Sa2VAChatConfig(**config_dict)
+        # sa2va_hf_config = Sa2VAChatConfig(**config_dict)
+        sa2va_hf_config = Sa2VADevChatConfig(**config_dict)
 
     if "qwen" in arch_type:
         # for qwen
         hf_sa2va_model = Sa2VAChatModelQwen(sa2va_hf_config, model=model.mllm.model)
     else:
+        # 评估用的是模型里的predict_forward函数
         hf_sa2va_model = Sa2VAChatModel(
+            # 一些参数放在config里
             sa2va_hf_config,
+            # 打分模型通过参数传进去，如scorer=model.mllm.model.scorer
             vision_model=model.mllm.model.vision_model,
             language_model=model.mllm.model.language_model,
         )
