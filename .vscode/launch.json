@@ -63,7 +63,7 @@
             "program": "tools/convert_to_hf_dev.py",
             "args": [
                 "projects/sa2va/configs/sa2va_in25_1b_dev_debug.py", 
-                "work_dirs/sa2va_in25_1b_dev_debug/iter_2560.pth",
+                "work_dirs/sa2va_in25_1b_dev_debug/iter_436.pth",
                 "--save-path", "pretrained/sa2va-dev-models/Sa2VA-1B"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",

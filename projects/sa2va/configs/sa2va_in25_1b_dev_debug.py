@@ -346,7 +346,7 @@ sa2va_data_06_vp_configs = [
 train_dataset = dict(
     type=ConcatDatasetSa2VA,
     datasets=[
-        *sa2va_data_01_refseg_configs,
+        # *sa2va_data_01_refseg_configs,
         # *sa2va_data_02_imageqa_configs,
         *sa2va_data_03_refvos_configs,
         # *sa2va_data_04_videoqa_configs,
