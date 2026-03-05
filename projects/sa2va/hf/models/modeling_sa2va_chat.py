@@ -493,6 +493,8 @@ class Sa2VAChatModel(PreTrainedModel):
                 vp_embeds = torch.cat(vp_embeds, dim=0)
             else:
                 vp_embeds = None
+            
+            # add there
 
             input_ids = input_ids.reshape(B * N)
             selected = (input_ids == self.img_context_token_id)
@@ -608,12 +610,15 @@ class Sa2VAChatModel(PreTrainedModel):
             input_text = past_text + input_text
             ids = self.tokenizer.encode(input_text)
             ids = torch.tensor(ids).cuda().unsqueeze(0)
-
+            # attention_mask是二维的
+            # @TODO: 可能需要改generate里attnmask和positionid的处理，更甚者可能要改llm的forward，因为visionselector论文改了llm的forward来适配LIS了
             attention_mask = torch.ones_like(ids, dtype=torch.bool)
 
             mm_inputs = {
                 'pixel_values': None,
                 'input_ids': ids,
+                # attention mask和positionid照样传入，会给llm的forward
+                # 以generate_args的形式传入generate函数，generate函数会传给model的forward
                 'attention_mask': attention_mask,
                 'position_ids': None,
                 'past_key_values': None,

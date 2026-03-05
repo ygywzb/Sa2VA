@@ -126,6 +126,9 @@ class Qwen2_5_VL(BaseModel):
         
         
         # DO NOT ENTER POSTION EMBEDDING HERE; Qwen2.5-VL will handle it inside (M-ROPE)
+        # 我的创新点只能在支持M-ROPE的模型上做，internvl2.5似乎行不通，因为internvl2.5的llm是基于传统位置编码的，删除某个视觉特征后，位置编码就不对了；而M-ROPE是根据实际输入的token数量动态计算位置编码的，所以删除某个视觉特征后，剩下的视觉特征的位置编码仍然是正确的。
+        # 传统的位置编码不能做删除某个视觉特征的操作，因为位置编码是固定的，删除某个视觉特征后，位置编码就不对了；
+        # 而M-ROPE是根据实际输入的token数量动态计算位置编码的，所以删除某个视觉特征后，剩下的视觉特征的位置编码仍然是正确的。
         output = self.model(
             input_ids=data['input_ids'],
             attention_mask=data['attention_mask'],
