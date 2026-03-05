@@ -80,11 +80,14 @@ def main():
     all_state_dict_new = {}
 
     # build the hf format model
-    from projects.sa2va.hf.models.configuration_sa2va_chat import Sa2VAChatConfig
-    from projects.sa2va.hf.models.modeling_sa2va_chat import Sa2VAChatModel
+    # from projects.sa2va.hf.models.configuration_sa2va_chat import Sa2VAChatConfig
+    # from projects.sa2va.hf.models.modeling_sa2va_chat import Sa2VAChatModel
 
     # for dev
     from projects.sa2va.hf.models.configuration_sa2va_dev_chat import Sa2VADevChatConfig
+    from projects.sa2va.hf.models.modeling_sa2va_dev_chat import Sa2VADevChatModel
+
+    # todo: 新建devchat类
 
     if "qwen3" in cfg.path.lower():
         from projects.sa2va.hf.models_qwen3vl.configuration_sa2va_chat import (
@@ -174,10 +177,16 @@ def main():
             key.startswith("importance_scorer") for key in all_state_dict_new.keys()
         ), "No importance_scorer keys found in the state dict"
 
+        # config_dict["auto_map"] = {
+        #     "AutoConfig": "configuration_sa2va_chat.Sa2VAChatConfig",
+        #     "AutoModel": "modeling_sa2va_chat.Sa2VAChatModel",
+        #     "AutoModelForCausalLM": "modeling_sa2va_chat.Sa2VAChatModel",
+        # }
+
         config_dict["auto_map"] = {
-            "AutoConfig": "configuration_sa2va_chat.Sa2VAChatConfig",
-            "AutoModel": "modeling_sa2va_chat.Sa2VAChatModel",
-            "AutoModelForCausalLM": "modeling_sa2va_chat.Sa2VAChatModel",
+            "AutoConfig": "configuration_sa2va_dev_chat.Sa2VADevChatConfig",
+            "AutoModel": "modeling_sa2va_dev_chat.Sa2VADevChatModel",
+            "AutoModelForCausalLM": "modeling_sa2va_dev_chat.Sa2VADevChatModel",
         }
 
         # sa2va_hf_config = Sa2VAChatConfig(**config_dict)
@@ -187,12 +196,23 @@ def main():
         # for qwen
         hf_sa2va_model = Sa2VAChatModelQwen(sa2va_hf_config, model=model.mllm.model)
     else:
+        # # 评估用的是模型里的predict_forward函数
+        # hf_sa2va_model = Sa2VAChatModel(
+        #     # 一些参数放在config里
+        #     sa2va_hf_config,
+        #     # 打分模型通过参数传进去，如scorer=model.mllm.model.scorer
+        #     vision_model=model.mllm.model.vision_model,
+        #     # 看language_model类型，看forward源码，找position_ids的处理方法，推理阶段似乎要复写
+        #     language_model=model.mllm.model.language_model,
+        # )
+
         # 评估用的是模型里的predict_forward函数
-        hf_sa2va_model = Sa2VAChatModel(
+        hf_sa2va_model = Sa2VADevChatModel(
             # 一些参数放在config里
             sa2va_hf_config,
             # 打分模型通过参数传进去，如scorer=model.mllm.model.scorer
             vision_model=model.mllm.model.vision_model,
+            # 看language_model类型，看forward源码，找position_ids的处理方法，推理阶段似乎要复写
             language_model=model.mllm.model.language_model,
         )
 
