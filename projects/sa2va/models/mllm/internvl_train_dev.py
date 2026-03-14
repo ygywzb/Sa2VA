@@ -113,6 +113,14 @@ class InternVLMLLM_Train_Dev(InternVLMLLM_Train):
             vit_embeds, vp_overall_mask, prompt_masks, image_flags, C
         )
 
+        # 原模型做法：
+        # 1. 动态分割导致每个batch里小图数量不一样，导致，如果直接用b，n表示，n不同无法reshape
+        # 2. 模型给的方法是把所有batch的小图拼在一起，此时就变成了all_small_pic_num, patch_num_per_small_pic, hidden_size的维度了
+        # 3. 然后模型把input_embeds也reshape成了b*n, hidden_size的维度，这样就能把动态数量的小图一次性赋值到input_embeds里
+        # 使用LIS出现的问题：
+        # 1. 目前加的打分机制必须针对于每个batch的所有小图，不能把所有batch拼一起，必须每个batch分开打分，最后再把结果拼一起
+        # 2. 而且在推理过程也是一样，要先按batch分开打分再合并，我需要记住每个batch的小图数量
+        # 3. 
         # -------创新代码加在这里------
         hidden_states = visual_embeds
         hidden_states_unsqueezed = hidden_states.unsqueeze(0)
