@@ -5,12 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Sa2VA-in25-1B Train(Debug)",
+            "name": "sa2va-1b-ori-debug",
             "type": "debugpy",
             "request": "launch",
             "program": "tools/train.py",
             "args": [
-                "projects/sa2va/configs/sa2va_in25_1b_debug.py", 
+                "projects/sa2va/configs/sa2va_in25_1b_ori_debug.py", 
                 "--deepspeed", "deepspeed_zero2"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
@@ -18,7 +18,8 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}", // 必须要加，不然会找不到本地模块(如projects)
                 "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300",
-                "CUDA_PATH": "/workspace/cuda-11.8",
+                "CUDA_PATH": "/usr/local/cuda-12.4", // 除非环境有全局CUDA_PATH变量，否则必须提供，导包过程需要
+                "CUDA_VISIBLE_DEVICES": "0", // 训练指定可见GPU
             }
         },
         {

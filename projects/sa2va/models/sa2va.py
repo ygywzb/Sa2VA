@@ -243,6 +243,7 @@ class Sa2VAModel(BaseModel):
         else:
             pred_embeddings = hidden_states[:, :5].flatten(0, 1) + _zero
 
+        # 一个视频只拿5帧，对应五个seg
         seg_token_counts = seg_token_mask.int().sum(-1)
         if not seg_valid:
             seg_token_counts += 5
