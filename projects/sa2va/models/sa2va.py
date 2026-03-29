@@ -69,6 +69,7 @@ class Sa2VAModel(BaseModel):
 
         in_dim = self.mllm.get_embedding_size()
         out_dim = self.grounding_encoder.hidden_dim
+        # 一个MLP从llm的hidden映射到sam的hidden上
         self.text_hidden_fcs = nn.Sequential(
             nn.Linear(in_dim, in_dim), nn.ReLU(inplace=True),
             nn.Linear(in_dim, out_dim), nn.Dropout(0.0)
