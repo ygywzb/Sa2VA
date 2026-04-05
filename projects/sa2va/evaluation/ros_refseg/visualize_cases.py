@@ -185,6 +185,9 @@ def parse_args():
     parser.add_argument('--data_root', type=str, default='./data/ROS-Sa2VA')
     parser.add_argument('--mode', choices=['high', 'low', 'mid', 'mixed'], default='mixed')
     parser.add_argument('--num_cases', type=int, default=4)
+    parser.add_argument('--min_iou', type=float, default=None)
+    parser.add_argument('--max_iou', type=float, default=None)
+    parser.add_argument('--exclude_zero_iou', action='store_true')
     parser.add_argument('--out_subdir', type=str, default='visualizations')
     return parser.parse_args()
 
@@ -196,6 +199,17 @@ def main():
         raise FileNotFoundError(f'Missing details file: {details_path}')
 
     rows = load_jsonl(details_path)
+
+    if args.exclude_zero_iou:
+        rows = [x for x in rows if float(x['iou']) > 0.0]
+    if args.min_iou is not None:
+        rows = [x for x in rows if float(x['iou']) >= args.min_iou]
+    if args.max_iou is not None:
+        rows = [x for x in rows if float(x['iou']) <= args.max_iou]
+
+    if len(rows) == 0:
+        raise RuntimeError('No samples left after IoU filtering. Please relax filter options.')
+
     selected = select_cases(rows, args.mode, args.num_cases)
 
     dataset_cfg = DATASET_MAP[args.dataset]
@@ -210,6 +224,12 @@ def main():
         'split': args.split,
         'mode': args.mode,
         'num_cases': args.num_cases,
+        'filters': {
+            'exclude_zero_iou': args.exclude_zero_iou,
+            'min_iou': args.min_iou,
+            'max_iou': args.max_iou,
+        },
+        'num_candidates_after_filter': len(rows),
         'cases': [],
     }
 
