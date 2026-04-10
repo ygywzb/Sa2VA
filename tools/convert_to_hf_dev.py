@@ -35,6 +35,31 @@ def parse_args():
     return args
 
 
+def remap_state_dict_keys(state_dict, name_map):
+    remapped = {}
+    for key, value in state_dict.items():
+        new_key = copy.deepcopy(key)
+        for src, dst in name_map.items():
+            new_key = new_key.replace(src, dst)
+        remapped[new_key] = value
+    return remapped
+
+
+def ensure_lis_weights_exist(state_dict):
+    required_lis_keys = [
+        "importance_scorer.k_proj.weight",
+        "importance_scorer.k_proj.bias",
+        "importance_scorer.q_proj.weight",
+        "importance_scorer.q_proj.bias",
+    ]
+    missing = [key for key in required_lis_keys if key not in state_dict]
+    if missing:
+        raise RuntimeError(
+            "Missing required LIS weights after key remapping: "
+            f"{missing}"
+        )
+
+
 @master_only
 def master_print(msg):
     print(msg)
@@ -141,16 +166,15 @@ def main():
             "Budget parameter is not implemented for Qwen models."
         )
     else:
-        config_dict["budgets"] = model.mllm.budgets
+        config_dict["budgets"] = float(model.mllm.budgets)
+        scorer = model.mllm.model.importance_scorer
+        config_dict["scorer_hidden_dim"] = int(getattr(scorer, "hidden_dim", 1792))
+        config_dict["scorer_init_scale"] = float(config_dict.get("scorer_init_scale", 0.0001))
 
     if "qwen" in arch_type:
         # for qwen
         name_map = {"mllm.": "", ".gamma": ".g_weight"}
-        for key in all_state_dict.keys():
-            new_key = copy.deepcopy(key)
-            for _text in name_map.keys():
-                new_key = new_key.replace(_text, name_map[_text])
-            all_state_dict_new[new_key] = all_state_dict[key]
+        all_state_dict_new = remap_state_dict_keys(all_state_dict, name_map)
 
         config_dict["auto_map"] = {
             "AutoConfig": "configuration_sa2va_chat.Sa2VAChatConfigQwen",
@@ -165,17 +189,8 @@ def main():
 
     else:
         name_map = {"mllm.model.": "", ".gamma": ".g_weight"}
-
-        for key in all_state_dict.keys():
-            new_key = copy.deepcopy(key)
-            for _text in name_map.keys():
-                new_key = new_key.replace(_text, name_map[_text])
-            all_state_dict_new[new_key] = all_state_dict[key]
-
-        # check LIS dict
-        assert any(
-            key.startswith("importance_scorer") for key in all_state_dict_new.keys()
-        ), "No importance_scorer keys found in the state dict"
+        all_state_dict_new = remap_state_dict_keys(all_state_dict, name_map)
+        ensure_lis_weights_exist(all_state_dict_new)
 
         # config_dict["auto_map"] = {
         #     "AutoConfig": "configuration_sa2va_chat.Sa2VAChatConfig",
@@ -216,7 +231,19 @@ def main():
             language_model=model.mllm.model.language_model,
         )
 
-    missing_keys, unexpected_keys = hf_sa2va_model.load_state_dict(all_state_dict_new)
+    missing_keys, unexpected_keys = hf_sa2va_model.load_state_dict(
+        all_state_dict_new, strict=False
+    )
+
+    if "qwen" not in arch_type:
+        critical_missing = [
+            key for key in missing_keys if key.startswith("importance_scorer.")
+        ]
+        if critical_missing:
+            raise RuntimeError(
+                "Critical LIS weights were not loaded into HF model: "
+                f"{critical_missing}"
+            )
 
     if args.save_path is None:
         args.save_path = f"./{os.path.dirname(args.pth_model)}_{iter_str}_hf"
@@ -231,6 +258,7 @@ def main():
         model.mllm.tokenizer.save_pretrained(args.save_path)
 
     master_print("\n--- Weight Loading Report ---")
+    master_print(f"Mapped state_dict keys: {len(all_state_dict_new)}")
     if missing_keys:
         master_print(f"Warning: Missing keys: {missing_keys}")
     if unexpected_keys:

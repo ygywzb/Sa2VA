@@ -1,12 +1,10 @@
 from .modeling_sa2va_chat import Sa2VAChatModel
 from .configuration_sa2va_dev_chat import Sa2VADevChatConfig
-from transformers import (AutoModel, GenerationConfig, LlamaForCausalLM,
-                          LlamaTokenizer, Qwen2ForCausalLM)
+from transformers import GenerationConfig
 
 # LIS
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from typing import Optional
 
 
@@ -89,14 +87,26 @@ class Sa2VADevChatModel(Sa2VAChatModel):
         use_flash_attn=True,
     ):
         super().__init__(config, vision_model, language_model, use_flash_attn)
-        self.importance_scorer = TransformerScorer(config.hidden_size)
+        self.importance_scorer = TransformerScorer(
+            config.hidden_size,
+            hidden_dim=config.scorer_hidden_dim,
+            init_scale=config.scorer_init_scale,
+        )
         self.budgets = config.budgets
-    
+
+    def _hard_topk_indices(self, scores: torch.Tensor) -> torch.Tensor:
+        total_tokens = int(scores.shape[0])
+        keep_tokens = max(1, int(total_tokens * self.budgets))
+        keep_tokens = min(keep_tokens, total_tokens)
+        selected = torch.topk(scores, k=keep_tokens, dim=0).indices
+        selected = selected.sort().values
+        return selected
+
     @torch.no_grad()
     def generate(
             self,
             pixel_values: Optional[torch.FloatTensor] = None,
-            input_ids: Optional[torch.FloatTensor] = None,
+            input_ids: Optional[torch.LongTensor] = None,
             attention_mask: Optional[torch.LongTensor] = None,
             visual_features: Optional[torch.FloatTensor] = None,
             generation_config: Optional[GenerationConfig] = None,
@@ -129,7 +139,13 @@ class Sa2VADevChatModel(Sa2VAChatModel):
 
             input_embeds = self.language_model.get_input_embeddings()(input_ids.to(device))
             B, N, C = input_embeds.shape
+            if B != 1:
+                raise NotImplementedError(
+                    "Sa2VADevChatModel.generate currently supports batch_size=1 when visual token pruning is enabled."
+                )
+
             input_embeds = input_embeds.reshape(B * N, C)
+            flat_input_ids = input_ids.to(device).reshape(B * N)
 
             if vp_overall_mask is not None and prompt_masks is not None:
                 vp_embeds = []
@@ -154,71 +170,59 @@ class Sa2VADevChatModel(Sa2VAChatModel):
                 vp_embeds = torch.cat(vp_embeds, dim=0)
             else:
                 vp_embeds = None
-            
-            # add there
-            # -------ADD START------
-            # <1> 通过LIS并直接topk，得到需要的视觉特征索引
-            hidden_states = vp_embeds
-            total_token_num = hidden_states.shape[0]
-            hidden_states_unsqueezed = hidden_states.unsqueeze(0)
-            # detach：复制一份参数，但其不参与梯度计算
-            learned_scores: torch.Tensor = self.importance_scorer(hidden_states_unsqueezed.detach()).squeeze(0) 
-            dominant_num = max(1, int(total_token_num * self.budgets))
-            # tensor自带的topk方法，索引是按分数从大到小排列的（会打乱原有顺序）
-            # 因此在后面还要sort一次恢复原有顺序
-            all_indices = learned_scores.topk(dominant_num, dim=0).indices   # get topk indices
-            all_indices = all_indices.sort().values
-            # 布尔索引只保留topk的token，且相对顺序不变
-            hidden_states_new = hidden_states[all_indices,:]
 
-            # <2> 再加上文本embeds的索引，得到seleted_indices，之后的positionid和attention_mask只用索引里的
-            # from 1:
-            _, all_indices, _ = hidden_states_new, all_indices, hidden_states_new.shape[0]
-            origin_image_indices = torch.where(input_ids == self.img_context_token_id)[1]
-            # 只包含topk后的index
-            retain_image_indices = origin_image_indices[all_indices]
-            origin_text_indices = torch.where(input_ids != self.img_context_token_id)[1]
-            # topk的index和所有text的index，归为正确顺序
-            combined_indices = torch.cat((retain_image_indices, origin_text_indices))
-            selected_indices, _ = torch.sort(combined_indices)
-            # --------ADD END-----------
+            flat_image_positions = torch.nonzero(
+                flat_input_ids == self.img_context_token_id, as_tuple=False
+            ).squeeze(-1)
+            if flat_image_positions.numel() == 0:
+                raise ValueError("No <IMG_CONTEXT> token found in input_ids, cannot align visual embeddings.")
 
-            # 按原逻辑照常拼接
-            input_ids = input_ids.reshape(B * N)
-            selected = (input_ids == self.img_context_token_id)
-            assert selected.sum() != 0
-            if vp_embeds is None:
-                input_embeds[selected] = vit_embeds.reshape(-1, C).to(input_embeds.device)
-            else:
-                if len(input_embeds[selected]) != len(vp_embeds.reshape(-1, C)):
-                    print("Shape mismatch, selected is {}, vp embeds is {} !!!" \
-                          .format(len(input_embeds[selected]), len(vp_embeds.reshape(-1, C))))
-                    min_tokens = min(len(input_embeds[selected]), len(vp_embeds.reshape(-1, C)))
-                    input_embeds[selected][:min_tokens] = vp_embeds.reshape(-1, C)[:min_tokens].to(input_embeds.device)
-                else:
-                    input_embeds[selected] = vp_embeds.reshape(-1, C).to(input_embeds.device)
+            visual_tokens = vit_embeds.reshape(-1, C) if vp_embeds is None else vp_embeds.reshape(-1, C)
+            visual_tokens = visual_tokens.to(input_embeds.device)
 
-            input_embeds = input_embeds.reshape(B, N, C)
+            required = int(flat_image_positions.numel())
+            available = int(visual_tokens.shape[0])
+            if available == 0:
+                raise ValueError("Visual tokens are empty after feature extraction; cannot perform top-k pruning.")
+            if available < required:
+                repeat_times = required // max(available, 1) + 1
+                visual_tokens = visual_tokens.repeat(repeat_times, 1)
+            visual_tokens = visual_tokens[:required]
+
+            input_embeds[flat_image_positions] = visual_tokens
+
+            learned_scores = self.importance_scorer(visual_tokens.unsqueeze(0).detach()).squeeze(0)
+            selected_visual_indices = self._hard_topk_indices(learned_scores)
+            retained_image_positions = flat_image_positions[selected_visual_indices]
+
+            flat_text_positions = torch.nonzero(
+                flat_input_ids != self.img_context_token_id, as_tuple=False
+            ).squeeze(-1)
+            selected_positions = torch.cat(
+                (retained_image_positions, flat_text_positions), dim=0
+            ).sort().values
+
+            input_embeds = input_embeds[selected_positions].unsqueeze(0)
+
+            if attention_mask is not None:
+                flat_attention_mask = attention_mask.to(device).reshape(B * N)
+                attention_mask = flat_attention_mask[selected_positions].unsqueeze(0)
         else:
-            input_embeds = self.language_model.get_input_embeddings()(input_ids)
+            input_embeds = self.language_model.get_input_embeddings()(input_ids.to(device))
+            if attention_mask is not None:
+                attention_mask = attention_mask.to(device)
 
-        # -------ADD START------
-        # 只是筛选视觉特征，因此只考虑输入有图像的情况
-        if pixel_values is not None:
-            if isinstance(self.language_model, Qwen2ForCausalLM):
-                
-                pass
-            pass
-        # -------ADD END------
+        model_generate_kwargs = dict(generate_kwargs)
+        if return_dict is not None and "return_dict_in_generate" not in model_generate_kwargs:
+            model_generate_kwargs["return_dict_in_generate"] = return_dict
 
         outputs = self.language_model.generate(
             inputs_embeds=input_embeds,
-            attention_mask=attention_mask.to(device),
+            attention_mask=attention_mask,
             generation_config=generation_config,
             output_hidden_states=output_hidden_states,
-            # return_dict=return_dict,
             use_cache=True,
-            **generate_kwargs,
+            **model_generate_kwargs,
         )
 
         return outputs

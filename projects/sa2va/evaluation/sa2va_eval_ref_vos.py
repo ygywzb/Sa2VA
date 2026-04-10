@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+from pathlib import Path
 
 import mmengine
 import numpy as np
@@ -108,10 +109,42 @@ def parse_args():
     parser.add_argument('--work_dir', type=str, default=None)
     parser.add_argument('--deepspeed', type=str, default=None) # dummy
     parser.add_argument('--data_root', default='./data', help='Root directory for all datasets.')
+    parser.add_argument('--num_workers', type=int, default=8)
+    parser.add_argument(
+        '--max_samples',
+        type=int,
+        default=-1,
+        help='Only evaluate the first N samples for smoke validation; -1 means full dataset.',
+    )
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
     return args
+
+
+def load_model_with_fallback(model_path):
+    try:
+        model = AutoModel.from_pretrained(
+            model_path,
+            torch_dtype=torch.bfloat16,
+            low_cpu_mem_usage=True,
+            use_flash_attn=True,
+            trust_remote_code=True,
+        ).eval().cuda()
+        return model
+    except FileNotFoundError as err:
+        local_modeling_file = Path(model_path) / 'modeling_sa2va_dev_chat.py'
+        if not local_modeling_file.exists():
+            raise err
+
+        from projects.sa2va.hf.models.modeling_sa2va_dev_chat import Sa2VADevChatModel
+
+        model = Sa2VADevChatModel.from_pretrained(
+            model_path,
+            torch_dtype=torch.bfloat16,
+            low_cpu_mem_usage=True,
+        ).eval().cuda()
+        return model
 
 
 if __name__ == '__main__':
@@ -139,13 +172,7 @@ if __name__ == '__main__':
         _init_dist_slurm('nccl')
         rank, world_size = get_dist_info()
 
-    model = AutoModel.from_pretrained(
-        args.model_path,
-        torch_dtype=torch.bfloat16,
-        low_cpu_mem_usage=True,
-        use_flash_attn=True,
-        trust_remote_code=True,
-    ).eval().cuda()
+    model = load_model_with_fallback(args.model_path)
 
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_path,
@@ -177,13 +204,15 @@ if __name__ == '__main__':
         dataset,
         sampler=sampler,
         batch_size=1,
-        num_workers=8,
+        num_workers=args.num_workers,
         pin_memory=False,
         collate_fn=lambda x:x[0],
     )
     results = []
     executor = concurrent.futures.ThreadPoolExecutor()
-    for item in tqdm.tqdm(dataloader):
+    for idx, item in enumerate(tqdm.tqdm(dataloader)):
+        if args.max_samples > 0 and idx >= args.max_samples:
+            break
         with torch.no_grad():
             result = model.predict_forward(
                 video=item['images'],
@@ -220,7 +249,7 @@ if __name__ == '__main__':
 
 
     executor.shutdown(wait=True)
-    print(f'[Rank {rank}] : Finished.')
+    print(f'[Rank {rank}] : Finished. Collected {len(results)} samples.')
     
     if not args.submit:
         results = collect_results_cpu(results, len(dataset))
