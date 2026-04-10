@@ -141,7 +141,7 @@ model = dict(
 #                      PART 3  Dataset & Dataloader                   #
 #######################################################################
 
-DATA_ROOT = "./data/"
+DATA_ROOT = "./data/debug/"
 VIDEO_DATA_ROOT = DATA_ROOT + "video_datas/"
 
 # this is for datasets with masks
