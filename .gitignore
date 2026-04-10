@@ -150,5 +150,5 @@ quick_test_output/
 projects/sa2va/tests/*
 
 # Other Projects
-projects/sa2va/VisionSelector
-projects/sa2va/ReSaP
+projects/VisionSelector
+projects/ReSaP
