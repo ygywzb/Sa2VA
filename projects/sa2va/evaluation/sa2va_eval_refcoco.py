@@ -1,6 +1,7 @@
 import argparse
 import copy
 import os
+import re
 from pathlib import Path
 import torch
 import tqdm
@@ -64,6 +65,20 @@ def mask_to_rle(mask):
         rle.append(_mask.encode(np.asfortranarray(m.astype(np.uint8))))
         rle[-1]['counts'] = rle[-1]['counts'].decode()
     return rle
+
+
+def extract_answer_seg_indices(text: str):
+    """Return SEG indices for answer span; fallback to all [SEG] when no answer tags exist."""
+    all_seg_indices = [m.start() for m in re.finditer(r'\[SEG\]', text)]
+    if len(all_seg_indices) == 0:
+        return []
+
+    _, answer_seg_idx = find_seg_indices(text)
+    if len(answer_seg_idx) > 0:
+        return answer_seg_idx
+
+    # Some checkpoints answer directly without <answer> tags.
+    return list(range(len(all_seg_indices)))
 
 
 
@@ -173,14 +188,12 @@ def main():
             print(f"Predicted Text: {pred_text}")
             
             print(f"Number of pred masks: {len(pred_mask)}")
-            
-            cleaned_pred_text = pred_text.replace('<|im_end|>', '').strip()
-            _, answer_seg_idx = find_seg_indices(cleaned_pred_text)
-            print(f"Answer seg indices with cleaned text: {answer_seg_idx}")
-            
+
+            cleaned_pred_text = pred_text.replace('<|im_end|>', '').replace('<|end|>', '').strip()
+            answer_seg_idx = extract_answer_seg_indices(cleaned_pred_text)
             if len(answer_seg_idx) == 0:
-                _, answer_seg_idx = find_seg_indices(pred_text)
-                #print(f"Answer seg indices with raw text: {answer_seg_idx}")
+                answer_seg_idx = extract_answer_seg_indices(pred_text)
+            print(f"Answer seg indices with fallback parser: {answer_seg_idx}")
             
             pred_texts.append(pred_text)
             
@@ -193,15 +206,14 @@ def main():
             else:
                 # List (1, h, w) -> (n, h, w)
                 pred_n_masks.append(np.concatenate(pred_mask, axis=0))
-    
-                cleaned_pred_text = pred_text.replace('<|im_end|>', '').replace('<|end|>', '').strip()
-                
-                _, answer_seg_idx = find_seg_indices(cleaned_pred_text)
-                
+
                 if len(answer_seg_idx) > 0:
                     print(f"Found {len(answer_seg_idx)} [SEG] tokens in answer, using corresponding masks")
 
                     selected_masks = [pred_mask[idx] for idx in answer_seg_idx if idx < len(pred_mask)]
+                    if len(selected_masks) == 0 and len(pred_mask) > 0:
+                        # Keep one prediction mask when SEG appears but index alignment fails.
+                        selected_masks = [pred_mask[0]]
                     
                     if len(selected_masks) > 0:
                         final_mask = selected_masks[0]
