@@ -1,6 +1,7 @@
 import argparse
 import copy
 import os
+from pathlib import Path
 import torch
 import tqdm
 from pycocotools import mask as _mask
@@ -83,13 +84,34 @@ def main():
         world_size = 1
 
     # build model
-    model = AutoModel.from_pretrained(
-        args.model_path,
-        torch_dtype=torch.bfloat16,
-        low_cpu_mem_usage=True,
-        use_flash_attn=True,
-        trust_remote_code=True,
-    ).eval().cuda()
+    try:
+        model = AutoModel.from_pretrained(
+            args.model_path,
+            torch_dtype=torch.bfloat16,
+            low_cpu_mem_usage=True,
+            use_flash_attn=True,
+            trust_remote_code=True,
+        ).eval().cuda()
+    except FileNotFoundError as err:
+        model_path = Path(args.model_path)
+        dev_modeling = model_path / 'modeling_sa2va_dev_chat.py'
+        base_modeling = model_path / 'modeling_sa2va_chat.py'
+        if dev_modeling.exists():
+            from projects.sa2va.hf.models.modeling_sa2va_dev_chat import Sa2VADevChatModel
+            model = Sa2VADevChatModel.from_pretrained(
+                args.model_path,
+                torch_dtype=torch.bfloat16,
+                low_cpu_mem_usage=True,
+            ).eval().cuda()
+        elif base_modeling.exists():
+            from projects.sa2va.hf.models.modeling_sa2va_chat import Sa2VAChatModel
+            model = Sa2VAChatModel.from_pretrained(
+                args.model_path,
+                torch_dtype=torch.bfloat16,
+                low_cpu_mem_usage=True,
+            ).eval().cuda()
+        else:
+            raise err
 
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_path,
