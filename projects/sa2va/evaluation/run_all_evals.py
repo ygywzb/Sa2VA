@@ -37,7 +37,7 @@ def main():
         },
         "RefVOS": {
             "script": os.path.join(base_path, "sa2va_eval_ref_vos.py"),
-            "datasets": ["DAVIS", "MEVIS_U"],
+            "datasets": ["DAVIS", "MEVIS_U", "REF_SAV"],
         }
     }
 
