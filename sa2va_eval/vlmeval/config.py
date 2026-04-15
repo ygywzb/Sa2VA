@@ -1,6 +1,7 @@
 from vlmeval.vlm import *
 from vlmeval.api import *
 from functools import partial
+import os
 
 PandaGPT_ROOT = None
 MiniGPT4_ROOT = None
@@ -14,6 +15,7 @@ VideoChatGPT_ROOT = None
 PLLaVA_ROOT = None
 RBDash_ROOT = None
 LLAVA_V1_7B_MODEL_PTH = 'Please set your local path to LLaVA-7B-v1.1 here, the model weight is obtained by merging LLaVA delta weight based on vicuna-7b-v1.1 in https://github.com/haotian-liu/LLaVA/blob/main/docs/MODEL_ZOO.md with vicuna-7b-v1.1. '
+SA2VA_LOCAL_PATH = os.environ.get('SA2VA_LOCAL_PATH', None)
 
 video_models = {
     'Video-LLaVA-7B':partial(VideoLLaVA, model_path='LanguageBind/Video-LLaVA-7B'),
@@ -154,6 +156,9 @@ internvl_series = {
     'Sa2VA-Qwen3-VL-2B': partial(Sa2VAChat, model_path='ByteDance/Sa2VA-Qwen3-VL-2B'),
     'Sa2VA-Qwen3-VL-4B': partial(Sa2VAChat, model_path='ByteDance/Sa2VA-Qwen3-VL-4B'),
 }
+
+if SA2VA_LOCAL_PATH is not None and len(SA2VA_LOCAL_PATH):
+    internvl_series['Sa2VA-Local'] = partial(Sa2VAChat, model_path=SA2VA_LOCAL_PATH)
 
 internvl3 = {
     "InternVL3-1B": partial(

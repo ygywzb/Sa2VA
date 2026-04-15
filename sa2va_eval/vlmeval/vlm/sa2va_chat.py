@@ -1,6 +1,8 @@
 import torch
 from transformers import AutoTokenizer, AutoConfig, AutoModel, CLIPImageProcessor, AutoModelForCausalLM, AutoProcessor
 from PIL import Image
+from pathlib import Path
+import sys
 from .base import BaseModel
 from ..smp import *
 from ..dataset import DATASET_TYPE
@@ -8,6 +10,63 @@ import pandas as pd
 import string
 import transformers
 import re
+
+
+def load_sa2va_model_with_fallback(model_path, *, load_in_8bit=False, model_split=False, model_split_name=None):
+    """Load Sa2VA model with fallback to in-repo modeling files for local HF checkpoints."""
+    if model_split:
+        assert model_split_name is not None
+        device_map = split_model(model_split_name)
+        return AutoModelForCausalLM.from_pretrained(
+            model_path,
+            torch_dtype=torch.bfloat16,
+            trust_remote_code=True,
+            load_in_8bit=load_in_8bit,
+            device_map=device_map,
+        ).eval()
+
+    try:
+        return AutoModelForCausalLM.from_pretrained(
+            model_path,
+            torch_dtype=torch.bfloat16,
+            trust_remote_code=True,
+            load_in_8bit=load_in_8bit,
+        ).eval()
+    except FileNotFoundError as err:
+        model_dir = Path(model_path)
+        dev_modeling = model_dir / 'modeling_sa2va_dev_chat.py'
+        base_modeling = model_dir / 'modeling_sa2va_chat.py'
+
+        if dev_modeling.exists():
+            try:
+                from projects.sa2va.hf.models.modeling_sa2va_dev_chat import Sa2VADevChatModel
+            except ModuleNotFoundError:
+                repo_root = Path(__file__).resolve().parents[3]
+                if str(repo_root) not in sys.path:
+                    sys.path.append(str(repo_root))
+                from projects.sa2va.hf.models.modeling_sa2va_dev_chat import Sa2VADevChatModel
+
+            return Sa2VADevChatModel.from_pretrained(
+                model_path,
+                torch_dtype=torch.bfloat16,
+                low_cpu_mem_usage=True,
+            ).eval()
+        if base_modeling.exists():
+            try:
+                from projects.sa2va.hf.models.modeling_sa2va_chat import Sa2VAChatModel
+            except ModuleNotFoundError:
+                repo_root = Path(__file__).resolve().parents[3]
+                if str(repo_root) not in sys.path:
+                    sys.path.append(str(repo_root))
+                from projects.sa2va.hf.models.modeling_sa2va_chat import Sa2VAChatModel
+
+            return Sa2VAChatModel.from_pretrained(
+                model_path,
+                torch_dtype=torch.bfloat16,
+                low_cpu_mem_usage=True,
+            ).eval()
+
+        raise err
 
 def split_model(model_name):
     import math
@@ -72,24 +131,21 @@ class Sa2VAChat(BaseModel):
         self.reverse_replacement = r'Image\1'
 
         if model_split:
-            assert model_split_name is not None
-            device_map = split_model(model_split_name)
-            self.model = AutoModelForCausalLM.from_pretrained(
+            self.model = load_sa2va_model_with_fallback(
                 model_path,
-                torch_dtype=torch.bfloat16,
-                trust_remote_code=True,
                 load_in_8bit=load_in_8bit,
-                device_map=device_map,
-            ).eval()
+                model_split=True,
+                model_split_name=model_split_name,
+            )
 
         else:
             device = torch.cuda.current_device()
             self.device = device
-            self.model = AutoModelForCausalLM.from_pretrained(
+            self.model = load_sa2va_model_with_fallback(
                 model_path,
-                torch_dtype=torch.bfloat16,
-                trust_remote_code=True,
-                load_in_8bit=load_in_8bit).eval()
+                load_in_8bit=load_in_8bit,
+                model_split=False,
+            )
             if not load_in_8bit:
                 self.model = self.model.to(device)
 
