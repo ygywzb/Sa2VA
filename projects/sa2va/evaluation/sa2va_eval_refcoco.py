@@ -1,7 +1,9 @@
 import argparse
 import copy
+import json
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 import torch
 import tqdm
@@ -44,6 +46,16 @@ def parse_args():
     parser.add_argument('--local_rank', '--local-rank', type=int, default=0)
     parser.add_argument('--deepspeed', type=str, default=None) # dummy
     parser.add_argument('--data_root', default='/mnt/bn/zilongdata-us/xiangtai/Sa2VA/data', help='Root directory for all datasets.')
+    parser.add_argument(
+        '--metric_output_dir',
+        type=str,
+        default=None,
+        help='Directory to save final evaluation metric as a JSON file. If not set, metric will not be written to disk.')
+    parser.add_argument(
+        '--metric_output_name',
+        type=str,
+        default=None,
+        help='Optional output filename for metric JSON. If not set, an auto-generated name is used.')
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
@@ -79,6 +91,32 @@ def extract_answer_seg_indices(text: str):
 
     # Some checkpoints answer directly without <answer> tags.
     return list(range(len(all_seg_indices)))
+
+
+def save_metric_to_file(metric: dict, args):
+    """Save final metric dictionary to a JSON file when output directory is provided."""
+    if args.metric_output_dir is None:
+        return None
+
+    dataset_output_dir = os.path.join(args.metric_output_dir, args.dataset)
+    os.makedirs(dataset_output_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = args.metric_output_name or f'{args.dataset}_{args.split}_metric.json'
+    output_path = os.path.join(dataset_output_dir, filename)
+
+    payload = {
+        'model_path': args.model_path,
+        'dataset': args.dataset,
+        'split': args.split,
+        'with_thinking': args.with_thinking,
+        'metric': metric,
+        'timestamp': timestamp,
+    }
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    return output_path
 
 
 
@@ -236,6 +274,9 @@ def main():
     if get_rank() == 0:
         metric = dataset.evaluate(results)
         print(metric)
+        metric_file = save_metric_to_file(metric, args)
+        if metric_file is not None:
+            print(f"Metric saved to: {metric_file}")
 
 if __name__ == '__main__':
     main()
