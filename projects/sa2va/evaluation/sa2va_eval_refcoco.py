@@ -93,50 +93,15 @@ def extract_answer_seg_indices(text: str):
     return list(range(len(all_seg_indices)))
 
 
-def _to_json_serializable(obj):
-    """Recursively convert numpy/torch objects to JSON-serializable Python types."""
-    if isinstance(obj, dict):
-        serialized = {}
-        for k, v in obj.items():
-            if isinstance(k, (str, int, float, bool)) or k is None:
-                key = k
-            else:
-                key = str(_to_json_serializable(k))
-            serialized[key] = _to_json_serializable(v)
-        return serialized
-    if isinstance(obj, (list, tuple)):
-        return [_to_json_serializable(v) for v in obj]
-    if isinstance(obj, set):
-        return [_to_json_serializable(v) for v in obj]
-    if isinstance(obj, np.ndarray):
-        return obj.tolist()
-    if isinstance(obj, np.generic):
-        return obj.item()
-    if isinstance(obj, torch.Tensor):
-        if obj.numel() == 1:
-            return obj.detach().cpu().item()
-        return obj.detach().cpu().tolist()
-    if isinstance(obj, Path):
-        return str(obj)
-    if hasattr(obj, 'item') and callable(getattr(obj, 'item')):
-        try:
-            return obj.item()
-        except Exception:
-            pass
-    if hasattr(obj, 'tolist') and callable(getattr(obj, 'tolist')):
-        try:
-            return obj.tolist()
-        except Exception:
-            pass
-    return obj
-
-
-def _json_dump_default(obj):
-    """Fallback serializer for any remaining object handled during json.dump."""
-    converted = _to_json_serializable(obj)
-    if converted is obj:
-        raise TypeError(f'Object of type {obj.__class__.__name__} is not JSON serializable')
-    return converted
+def _normalize_metric_for_json(metric: dict):
+    """Convert numpy scalar metrics (e.g., float32) to native Python values."""
+    normalized = {}
+    for k, v in metric.items():
+        if isinstance(v, np.generic):
+            normalized[k] = v.item()
+        else:
+            normalized[k] = v
+    return normalized
 
 
 def save_metric_to_file(metric: dict, args):
@@ -156,11 +121,11 @@ def save_metric_to_file(metric: dict, args):
         'dataset': args.dataset,
         'split': args.split,
         'with_thinking': args.with_thinking,
-        'metric': _to_json_serializable(metric),
+        'metric': _normalize_metric_for_json(metric),
         'timestamp': timestamp,
     }
     with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(_to_json_serializable(payload), f, ensure_ascii=False, indent=2, default=_json_dump_default)
+        json.dump(payload, f, ensure_ascii=False, indent=2)
 
     return output_path
 
