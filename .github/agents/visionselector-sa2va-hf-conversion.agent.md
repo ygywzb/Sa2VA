@@ -51,3 +51,11 @@ Return:
 2. Exact conversion/eval commands executed.
 3. Any remaining blockers specific to RVOS-only constraints.
 4. Next minimal actions to reach stable reproducibility.
+
+## Local Environment Notes
+- Python virtual environment is available at .venv in repo root.
+- Prefer using .venv interpreter directly for deterministic runs: /hy-tmp/Sa2VA/.venv/bin/python.
+- Optional activation flow before running commands:
+  - source /hy-tmp/Sa2VA/.venv/bin/activate
+  - python <script_or_module>
+- Run conversion/evaluation commands from repository root /hy-tmp/Sa2VA unless a script requires another working directory.
