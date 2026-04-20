@@ -23,6 +23,8 @@ def main():
     base_path = "./projects/sa2va/evaluation"
     dist_test_script = "./projects/sa2va/evaluation/dist_test.sh"
 
+    eval_output_path = f"{os.path.dirname(args.model_path)}/eval"
+
     # --- Evaluation Commands ---
     eval_configs = {
         "RefCOCO": {
@@ -37,7 +39,7 @@ def main():
         },
         "RefVOS": {
             "script": os.path.join(base_path, "sa2va_eval_ref_vos.py"),
-            "datasets": ["DAVIS", "MEVIS_U", "REF_SAV"],
+            "datasets": ["DAVIS", "MEVIS_U", "REF_SAV", "REVOS"],
         }
     }
 
@@ -46,26 +48,27 @@ def main():
         refcoco_config = eval_configs["RefCOCO"]
         for dataset in refcoco_config["datasets"]:
             print(f"\n----- Running RefCOCO evaluation for {dataset} -----")
-            script_args = f"--dataset={dataset} --split={refcoco_config['split']} --data_root={args.data_root}"
+            work_dir = f"{eval_output_path}/refcoco"
+            script_args = f"--dataset={dataset} --split={refcoco_config['split']} --data_root={args.data_root} --metric_output_dir={work_dir}"
             cmd = ["bash", dist_test_script, refcoco_config["script"], args.model_path, args.gpus] + script_args.split()
             run_command(cmd)
 
         # --- GCG ---
-        gcg_config = eval_configs["GCG"]
-        print("\n----- Running GCG evaluation -----")
-        gcg_pred_dir = f"./gcg_pred/{os.path.basename(args.model_path)}"
-        script_args_gcg = f"--split={gcg_config['split']} --save_dir={gcg_pred_dir} --data_root={args.data_root}"
-        cmd_gcg = ["bash", dist_test_script, gcg_config["script"], args.model_path, args.gpus] + script_args_gcg.split()
-        run_command(cmd_gcg)
-        print("\n----- Calculating GCG metrics -----")
-        cmd_gcg_metrics = ["python", gcg_config["metrics_script"], f"--split={gcg_config['split']}", f"--prediction_dir_path={gcg_pred_dir}", f"--gt_dir_path={os.path.join(args.data_root, 'glamm_data/annotations/gcg_val_test/')}"]
-        run_command(cmd_gcg_metrics)
+        # gcg_config = eval_configs["GCG"]
+        # print("\n----- Running GCG evaluation -----")
+        # gcg_pred_dir = f"{eval_output_path}/gcg"
+        # script_args_gcg = f"--split={gcg_config['split']} --save_dir={gcg_pred_dir} --data_root={args.data_root}"
+        # cmd_gcg = ["bash", dist_test_script, gcg_config["script"], args.model_path, args.gpus] + script_args_gcg.split()
+        # run_command(cmd_gcg)
+        # print("\n----- Calculating GCG metrics -----")
+        # cmd_gcg_metrics = ["python", gcg_config["metrics_script"], f"--split={gcg_config['split']}", f"--prediction_dir_path={gcg_pred_dir}", f"--gt_dir_path={os.path.join(args.data_root, 'glamm_data/annotations/gcg_val_test/')}"]
+        # run_command(cmd_gcg_metrics)
 
         # --- RefVOS ---
         refvos_config = eval_configs["RefVOS"]
         for dataset in refvos_config["datasets"]:
             print(f"\n----- Running RefVOS evaluation for {dataset} -----")
-            work_dir = f"work_dirs/{os.path.basename(args.model_path)}"
+            work_dir = f"{eval_output_path}/refvos"
             script_args_vos = f"--dataset={dataset} --work_dir={work_dir} --data_root={args.data_root}"
             cmd_vos = ["bash", dist_test_script, refvos_config["script"], args.model_path, args.gpus] + script_args_vos.split()
             run_command(cmd_vos)
