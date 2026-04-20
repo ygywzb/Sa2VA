@@ -113,5 +113,28 @@
                 "CUDA_VISIBLE_DEVICES": "3", // 训练指定可见GPU
             }
         },
+        {
+            "name": "sa2va_eval MMMU_DEV_VAL debug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "sa2va_eval/run.py",
+            "args": [
+                "--data", "MMMU_DEV_VAL", 
+                "--model", "Sa2VA-Local",
+                "--verbose"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}", // 必须要加，不然会找不到本地模块(如projects)
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300",
+                "CUDA_VISIBLE_DEVICES": "0", // 训练指定可见GPU
+                // sa2va_eval env:
+                "HF_HOME": "/hy-tmp/sa2va-data/.cache/huggingface",
+                "LMUData": "data/sa2va_eval/LMUData",
+                "MMEVAL_ROOT": "work_dirs/sa2va_in25_1b_bgt20/mmeval",
+                "SA2VA_LOCAL_PATH": "work_dirs/sa2va_in25_1b_bgt20/sa2va_in25_1b_bgt20_hf",
+            }
+        },
     ]
 }

@@ -266,7 +266,8 @@ class MMMUDataset(ImageMCQDataset):
     }
 
     DATASET_MD5 = {
-        'MMMU_DEV_VAL': '521afc0f3bf341e6654327792781644d',
+        # 'MMMU_DEV_VAL': '521afc0f3bf341e6654327792781644d', # old md5
+        'MMMU_DEV_VAL':'585e8ad75e73f75dcad265dfd0417d64',
         'MMMU_TEST': 'c19875d11a2d348d07e5eb4bdf33166d',
     }
 
