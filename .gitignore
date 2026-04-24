@@ -152,3 +152,7 @@ projects/sa2va/tests/*
 # Other Projects
 projects/VisionSelector
 projects/ReSaP
+
+# sa2va-eval
+dataset
+dataset/
