@@ -3,6 +3,7 @@ from .configuration_sa2va_dev_chat import Sa2VADevChatConfig
 from transformers import GenerationConfig
 
 # LIS
+import os
 import torch
 import torch.nn as nn
 from typing import Optional
@@ -93,6 +94,7 @@ class Sa2VADevChatModel(Sa2VAChatModel):
             init_scale=config.scorer_init_scale,
         )
         self.budgets = config.budgets
+        self._last_efficiency_metrics = None
 
     def _hard_topk_indices(self, scores: torch.Tensor) -> torch.Tensor:
         total_tokens = int(scores.shape[0])
@@ -118,6 +120,19 @@ class Sa2VADevChatModel(Sa2VAChatModel):
     ) -> torch.LongTensor:
         device = self.device
         assert self.img_context_token_id is not None
+
+        eval_time_enabled = os.environ.get('EVAL_TIME', 'false').lower() == 'true'
+        collect_cuda_metrics = eval_time_enabled and torch.cuda.is_available()
+        sample_metrics = {
+            'input_visual_token_num': 0,
+            'selected_visual_token_num': 0,
+            'generation_prefill_time_ms': None,
+            'generation_latency_time_ms': None,
+            'after_generation_memory_bytes': None,
+        }
+
+        # This is only used for timing the first prefill forward during generation.
+        prefill_time_ms = None
 
         if pixel_values is not None:
             if visual_features is not None:
@@ -194,6 +209,8 @@ class Sa2VADevChatModel(Sa2VAChatModel):
             learned_scores = self.importance_scorer(visual_tokens.unsqueeze(0).detach()).squeeze(0)
             selected_visual_indices = self._hard_topk_indices(learned_scores)
             retained_image_positions = flat_image_positions[selected_visual_indices]
+            sample_metrics['input_visual_token_num'] = required
+            sample_metrics['selected_visual_token_num'] = int(selected_visual_indices.numel())
 
             flat_text_positions = torch.nonzero(
                 flat_input_ids != self.img_context_token_id, as_tuple=False
@@ -216,13 +233,67 @@ class Sa2VADevChatModel(Sa2VAChatModel):
         if return_dict is not None and "return_dict_in_generate" not in model_generate_kwargs:
             model_generate_kwargs["return_dict_in_generate"] = return_dict
 
-        outputs = self.language_model.generate(
-            inputs_embeds=input_embeds,
-            attention_mask=attention_mask,
-            generation_config=generation_config,
-            output_hidden_states=output_hidden_states,
-            use_cache=True,
-            **model_generate_kwargs,
-        )
+        original_forward = None
+        e2e_start = None
+        e2e_end = None
+
+        if collect_cuda_metrics:
+            e2e_start = torch.cuda.Event(enable_timing=True)
+            e2e_end = torch.cuda.Event(enable_timing=True)
+            e2e_start.record()
+            original_forward = self.language_model.forward
+
+            def wrapped_forward(*args, **kwargs):
+                nonlocal prefill_time_ms
+                seq_len = None
+                if kwargs.get('inputs_embeds', None) is not None:
+                    seq_len = kwargs['inputs_embeds'].shape[1]
+                elif kwargs.get('input_ids', None) is not None:
+                    seq_len = kwargs['input_ids'].shape[1]
+
+                if prefill_time_ms is None and seq_len is not None and seq_len > 1:
+                    prefill_start = torch.cuda.Event(enable_timing=True)
+                    prefill_end = torch.cuda.Event(enable_timing=True)
+                    prefill_start.record()
+                    output = original_forward(*args, **kwargs)
+                    prefill_end.record()
+                    torch.cuda.synchronize()
+                    prefill_time_ms = float(prefill_start.elapsed_time(prefill_end))
+                    return output
+
+                return original_forward(*args, **kwargs)
+
+            self.language_model.forward = wrapped_forward
+
+        try:
+            outputs = self.language_model.generate(
+                inputs_embeds=input_embeds,
+                attention_mask=attention_mask,
+                generation_config=generation_config,
+                output_hidden_states=output_hidden_states,
+                use_cache=True,
+                **model_generate_kwargs,
+            )
+        finally:
+            if original_forward is not None:
+                self.language_model.forward = original_forward
+
+        if collect_cuda_metrics:
+            e2e_end.record()
+            torch.cuda.synchronize()
+            sample_metrics['generation_prefill_time_ms'] = prefill_time_ms
+            sample_metrics['generation_latency_time_ms'] = float(e2e_start.elapsed_time(e2e_end))
+            sample_metrics['after_generation_memory_bytes'] = int(torch.cuda.max_memory_allocated(device))
+            torch.cuda.reset_peak_memory_stats(device)
+
+            print(f"Input visual token number is: {sample_metrics['input_visual_token_num']}")
+            if sample_metrics['generation_prefill_time_ms'] is not None:
+                print(f"Generation prefill time is: {sample_metrics['generation_prefill_time_ms']}")
+            print(f"Generation latency time is: {sample_metrics['generation_latency_time_ms']}")
+            print(f"after generation memory: {sample_metrics['after_generation_memory_bytes']}")
+
+            self._last_efficiency_metrics = sample_metrics
+        else:
+            self._last_efficiency_metrics = None
 
         return outputs
