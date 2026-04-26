@@ -45,42 +45,6 @@ def mask_save(item, mask_prediction, work_dir):
         mask.save(save_file)
 
 
-def is_eval_time_enabled():
-    return os.environ.get('EVAL_TIME', 'false').lower() == 'true'
-
-
-def get_model_efficiency_metrics(model):
-    metrics = getattr(model, '_last_efficiency_metrics', None)
-    if metrics is None:
-        return None
-    if not isinstance(metrics, dict):
-        return None
-    return dict(metrics)
-
-
-def summarize_efficiency_metrics(metrics_list):
-    def mean_of(key):
-        values = [float(item[key]) for item in metrics_list if item.get(key) is not None]
-        if len(values) == 0:
-            return None
-        return float(np.mean(values))
-
-    avg_after_generation_memory_bytes = mean_of('after_generation_memory_bytes')
-
-    return {
-        'num_samples': len(metrics_list),
-        'avg_input_visual_token_num': mean_of('input_visual_token_num'),
-        'avg_selected_visual_token_num': mean_of('selected_visual_token_num'),
-        'avg_generation_prefill_time_ms': mean_of('generation_prefill_time_ms'),
-        'avg_generation_latency_time_ms': mean_of('generation_latency_time_ms'),
-        'avg_after_generation_memory_bytes': avg_after_generation_memory_bytes,
-        'avg_after_generation_memory_gb': (
-            avg_after_generation_memory_bytes / (1024 ** 3)
-            if avg_after_generation_memory_bytes is not None else None
-        ),
-    }
-
-
 DATASETS_INFO = {
     'DAVIS': {
         'data_root': 'data/video_datas/davis17/',
@@ -185,7 +149,6 @@ def load_model_with_fallback(model_path):
 
 if __name__ == '__main__':
     args = parse_args()
-    eval_time_enabled = is_eval_time_enabled()
 
     # Update dataset paths with data_root
     for key, info in DATASETS_INFO.items():
@@ -210,10 +173,6 @@ if __name__ == '__main__':
         rank, world_size = get_dist_info()
 
     model = load_model_with_fallback(args.model_path)
-
-    if eval_time_enabled and torch.cuda.is_available():
-        # Reset once before eval starts so the first sample peak is not polluted by model load.
-        torch.cuda.reset_peak_memory_stats()
 
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_path,
@@ -250,7 +209,6 @@ if __name__ == '__main__':
         collate_fn=lambda x:x[0],
     )
     results = []
-    efficiency_metrics = []
     executor = concurrent.futures.ThreadPoolExecutor()
     for idx, item in enumerate(tqdm.tqdm(dataloader)):
         if args.max_samples > 0 and idx >= args.max_samples:
@@ -262,12 +220,6 @@ if __name__ == '__main__':
                 tokenizer=tokenizer,
                 processor=processor,
             )
-
-        if eval_time_enabled:
-            sample_efficiency = get_model_efficiency_metrics(model)
-            if sample_efficiency is not None:
-                sample_efficiency['index'] = item['index']
-                efficiency_metrics.append(sample_efficiency)
 
         text_idx = 0
         text_prediction = result['prediction']
@@ -301,14 +253,6 @@ if __name__ == '__main__':
     
     if not args.submit:
         results = collect_results_cpu(results, len(dataset))
-
-        gathered_efficiency_metrics = None
-        if eval_time_enabled:
-            metric_size = len(dataset)
-            if args.max_samples > 0:
-                metric_size = min(metric_size, args.max_samples)
-            gathered_efficiency_metrics = collect_results_cpu(efficiency_metrics, metric_size)
-
         if get_rank() == 0:
             final_results = {}
             for item in results:
@@ -321,17 +265,6 @@ if __name__ == '__main__':
             work_dir = os.path.join(work_dir, args.dataset)
             os.makedirs(work_dir, exist_ok=True)
             json.dump(final_results, open(f'{work_dir}/results.json', 'w'))
-
-            if eval_time_enabled:
-                valid_efficiency = gathered_efficiency_metrics if gathered_efficiency_metrics is not None else []
-                efficiency_summary = summarize_efficiency_metrics(valid_efficiency)
-                efficiency_summary['dataset'] = args.dataset
-                efficiency_summary['metrics_source'] = 'projects/sa2va/hf/models/modeling_sa2va_dev_chat.py'
-
-                efficiency_output_path = os.path.join(work_dir, 'efficiency_metrics.json')
-                with open(efficiency_output_path, 'w') as f:
-                    json.dump(efficiency_summary, f, indent=2)
-                print(f'Efficiency metrics saved to {efficiency_output_path}')
 
     if rank == 0:
         print('Done')
