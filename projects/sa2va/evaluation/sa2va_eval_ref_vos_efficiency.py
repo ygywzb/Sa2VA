@@ -1,4 +1,5 @@
 import argparse
+import inspect
 import os
 import types
 from pathlib import Path
@@ -107,30 +108,66 @@ def load_model_with_fallback(model_path):
         ).eval().cuda()
         return model
     except FileNotFoundError as err:
-        local_modeling_file = Path(model_path) / "modeling_sa2va_dev_chat.py"
-        if not local_modeling_file.exists():
-            raise err
+        model_dir = Path(model_path)
+        dev_modeling = model_dir / "modeling_sa2va_dev_chat.py"
+        base_modeling = model_dir / "modeling_sa2va_chat.py"
 
-        from projects.sa2va.hf.models.modeling_sa2va_dev_chat import Sa2VADevChatModel
+        if dev_modeling.exists():
+            try:
+                from projects.sa2va.hf.models.modeling_sa2va_dev_chat import Sa2VADevChatModel
+            except ModuleNotFoundError:
+                repo_root = Path(__file__).resolve().parents[3]
+                if str(repo_root) not in os.sys.path:
+                    os.sys.path.append(str(repo_root))
+                from projects.sa2va.hf.models.modeling_sa2va_dev_chat import Sa2VADevChatModel
 
-        model = Sa2VADevChatModel.from_pretrained(
-            model_path,
-            torch_dtype=torch.bfloat16,
-            low_cpu_mem_usage=True,
-        ).eval().cuda()
-        return model
+            model = Sa2VADevChatModel.from_pretrained(
+                model_path,
+                torch_dtype=torch.bfloat16,
+                low_cpu_mem_usage=True,
+            ).eval().cuda()
+            return model
+
+        if base_modeling.exists():
+            try:
+                from projects.sa2va.hf.models.modeling_sa2va_chat import Sa2VAChatModel
+            except ModuleNotFoundError:
+                repo_root = Path(__file__).resolve().parents[3]
+                if str(repo_root) not in os.sys.path:
+                    os.sys.path.append(str(repo_root))
+                from projects.sa2va.hf.models.modeling_sa2va_chat import Sa2VAChatModel
+
+            model = Sa2VAChatModel.from_pretrained(
+                model_path,
+                torch_dtype=torch.bfloat16,
+                low_cpu_mem_usage=True,
+            ).eval().cuda()
+            return model
+
+        raise err
 
 
 def apply_efficiency_monkey_patch(model):
     from projects.sa2va.hf.models.modeling_sa2va_dev_chat_efficiency import (
         Sa2VADevChatEfficiencyModel,
     )
+    from projects.sa2va.hf.models.modeling_sa2va_chat_efficiency import (
+        Sa2VAChatEfficiencyModel,
+    )
 
     if hasattr(model, "_original_generate"):
         return model
 
     model._original_generate = model.generate
-    model.generate = types.MethodType(Sa2VADevChatEfficiencyModel.generate, model)
+
+    # Dev model has visual token selector modules; baseline model does not.
+    is_dev_like = hasattr(model, "importance_scorer") and hasattr(model, "_hard_topk_indices")
+
+    if is_dev_like:
+        model.generate = types.MethodType(Sa2VADevChatEfficiencyModel.generate, model)
+    else:
+        model.generate = types.MethodType(Sa2VAChatEfficiencyModel.generate, model)
+
     return model
 
 
@@ -166,6 +203,23 @@ def summarize_metrics(all_metrics):
         "avg_visual_token_num": (sum(visual_num) / len(visual_num)) if visual_num else None,
     }
     return summary
+
+
+def build_predict_forward_kwargs(model, item, tokenizer, processor):
+    sig = inspect.signature(model.predict_forward)
+    params = sig.parameters
+
+    kwargs = {
+        "video": item["images"],
+        "text": item["text_prompt"],
+    }
+
+    if "tokenizer" in params:
+        kwargs["tokenizer"] = tokenizer
+    if "processor" in params and processor is not None:
+        kwargs["processor"] = processor
+
+    return kwargs
 
 
 def print_summary(summary):
@@ -260,12 +314,13 @@ if __name__ == "__main__":
             break
 
         with torch.no_grad():
-            model.predict_forward(
-                video=item["images"],
-                text=item["text_prompt"],
+            predict_kwargs = build_predict_forward_kwargs(
+                model=model,
+                item=item,
                 tokenizer=tokenizer,
                 processor=processor,
             )
+            model.predict_forward(**predict_kwargs)
 
         local_metrics.append(getattr(model, "_last_efficiency_metrics", None))
 
