@@ -61,9 +61,13 @@ if __name__ == '__main__':
     parser.add_argument("pred_path", type=str, )
     parser.add_argument("--exp_path", type=str, default="data/ref_sav_eval/meta_expressions_valid.json")
     parser.add_argument("--mask_path", type=str, default="data/ref_sav_eval/mask_dict.json")
+    parser.add_argument("--data_root", default="./data", help="Root directory for all datasets.")
     parser.add_argument("--save_json_name", type=str, default="ref_sav_valid.json")
     parser.add_argument("--save_csv_name", type=str, default="ref_sav_valid.csv")
     args = parser.parse_args()
+    if args.data_root:
+        args.exp_path = osp.join(args.data_root, osp.relpath(args.exp_path, "./data"))
+        args.mask_path = osp.join(args.data_root, osp.relpath(args.mask_path, "./data"))
     queue                = mp.Queue()
     exp_dict             = json.load(open(args.exp_path))['videos']
     mask_dict            = json.load(open(args.mask_path))

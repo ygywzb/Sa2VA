@@ -74,8 +74,12 @@ if __name__ == '__main__':
                         default="data/video_datas/davis17/meta_expressions/valid/meta_expressions.json")
     parser.add_argument("--mevis_mask_path", type=str,
                         default="data/video_datas/davis17/valid/mask_dict.pkl")
+    parser.add_argument("--data_root", default="./data", help="Root directory for all datasets.")
     parser.add_argument("--save_name", type=str, default="davis17_val.json")
     args = parser.parse_args()
+    if args.data_root:
+        args.mevis_exp_path = osp.join(args.data_root, osp.relpath(args.mevis_exp_path, "./data"))
+        args.mevis_mask_path = osp.join(args.data_root, osp.relpath(args.mevis_mask_path, "./data"))
     queue = mp.Queue()
     exp_dict = get_meta_exp(args.mevis_exp_path)
     if args.mevis_mask_path.endswith('json'):

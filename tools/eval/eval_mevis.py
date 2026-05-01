@@ -57,8 +57,12 @@ if __name__ == '__main__':
                         default="./data/video_datas/mevis/valid_u/meta_expressions.json")
     parser.add_argument("--mevis_mask_path", type=str,
                         default="./data/video_datas/mevis/valid_u/mask_dict.json")
+    parser.add_argument("--data_root", default="./data", help="Root directory for all datasets.")
     parser.add_argument("--save_name", type=str, default="mevis_valu.json")
     args = parser.parse_args()
+    if args.data_root:
+        args.mevis_exp_path = osp.join(args.data_root, osp.relpath(args.mevis_exp_path, "./data"))
+        args.mevis_mask_path = osp.join(args.data_root, osp.relpath(args.mevis_mask_path, "./data"))
     queue = mp.Queue()
     exp_dict = json.load(open(args.mevis_exp_path))['videos']
     mask_dict = json.load(open(args.mevis_mask_path))
