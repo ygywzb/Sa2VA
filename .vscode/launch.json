@@ -136,5 +136,24 @@
                 "SA2VA_LOCAL_PATH": "work_dirs/sa2va_in25_1b_bgt20/sa2va_in25_1b_bgt20_hf",
             }
         },
+        {
+            "name": "sa2va_eval_ref_vos_visualize debug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "projects/sa2va/evaluation/sa2va_eval_ref_vos_visualize.py",
+            "args": [
+                "work_dirs/sa2va_in25_1b_bgt40/sa2va_in25_1b_bgt40_hf",
+                "--dataset", "MEVIS_U", 
+                "--data_root", "data/baseline",
+                "--num_workers", "0"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300",
+                "CUDA_VISIBLE_DEVICES": "0",
+            }
+        },
     ]
 }
