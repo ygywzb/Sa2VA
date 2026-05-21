@@ -156,3 +156,5 @@ projects/ReSaP
 # sa2va-eval
 dataset
 dataset/
+tmp
+tmp/

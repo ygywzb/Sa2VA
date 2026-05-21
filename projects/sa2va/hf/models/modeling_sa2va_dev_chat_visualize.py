@@ -100,6 +100,14 @@ class Sa2VADevChatVisualizeModel(Sa2VADevChatModel):
             input_embeds[flat_image_positions] = visual_tokens
 
             learned_scores = self.importance_scorer(visual_tokens.unsqueeze(0).detach()).squeeze(0)
+            self._store_importance_grid(
+                learned_scores=learned_scores,
+                num_images=vit_embeds.shape[0],
+                tokens_per_image=vit_embeds.shape[1],
+                vp_overall_mask=vp_overall_mask,
+                prompt_masks=prompt_masks,
+                required=required,
+            )
             selected_visual_indices = self._hard_topk_indices(learned_scores)
             retained_image_positions = flat_image_positions[selected_visual_indices]
 
@@ -135,6 +143,156 @@ class Sa2VADevChatVisualizeModel(Sa2VADevChatModel):
 
         return outputs
 
+    def _store_importance_grid(
+        self,
+        learned_scores: torch.Tensor,
+        num_images: int,
+        tokens_per_image: int,
+        vp_overall_mask,
+        prompt_masks,
+        required: Optional[int],
+    ) -> None:
+        grid_size = int(tokens_per_image ** 0.5)
+        if grid_size * grid_size != tokens_per_image:
+            return
+
+        mappings = self._build_visual_token_mappings(
+            num_images=num_images,
+            tokens_per_image=tokens_per_image,
+            vp_overall_mask=vp_overall_mask,
+            prompt_masks=prompt_masks,
+        )
+        if not mappings:
+            return
+
+        if required is not None:
+            if len(mappings) < required:
+                repeat_times = required // max(len(mappings), 1) + 1
+                mappings = (mappings * repeat_times)[:required]
+            else:
+                mappings = mappings[:required]
+
+        scores = learned_scores.detach().float().cpu()
+        grid_scores = torch.full((num_images, tokens_per_image), float("-inf"))
+        for idx, (img_idx, tok_idx) in enumerate(mappings):
+            if idx >= scores.numel():
+                break
+            score = float(scores[idx])
+            if score > grid_scores[img_idx, tok_idx]:
+                grid_scores[img_idx, tok_idx] = score
+
+        grid_scores[grid_scores == float("-inf")] = 0.0
+        self._last_importance_grid = {
+            "grid_scores": grid_scores.view(num_images, grid_size, grid_size),
+            "grid_size": grid_size,
+            "num_images": num_images,
+            "tokens_per_image": tokens_per_image,
+        }
+
+    def _build_visual_token_mappings(
+        self,
+        num_images: int,
+        tokens_per_image: int,
+        vp_overall_mask,
+        prompt_masks,
+    ):
+        mappings = []
+        if vp_overall_mask is not None and prompt_masks is not None:
+            vp_mask = vp_overall_mask.detach().cpu().bool()
+            prompt_masks_cpu = [mask.detach().cpu() for mask in prompt_masks]
+            i_vp_img = 0
+            for i_img in range(num_images):
+                mappings.extend((i_img, idx) for idx in range(tokens_per_image))
+                if bool(vp_mask[i_img]):
+                    obj_mask = prompt_masks_cpu[i_vp_img].reshape(
+                        prompt_masks_cpu[i_vp_img].shape[0], -1
+                    )
+                    flat_mask = obj_mask.reshape(-1)
+                    selected = torch.nonzero(flat_mask, as_tuple=False).squeeze(-1)
+                    for flat_idx in selected.tolist():
+                        mappings.append((i_img, int(flat_idx % tokens_per_image)))
+                    i_vp_img += 1
+        else:
+            for i_img in range(num_images):
+                mappings.extend((i_img, idx) for idx in range(tokens_per_image))
+        return mappings
+
+    def _build_importance_maps(self, num_frames, ori_image_size, images=None):
+        info = getattr(self, "_last_importance_grid", None)
+        if info is None:
+            return None
+
+        grid_scores = info["grid_scores"]
+        orig_w, orig_h = ori_image_size
+        image_size = int(self.image_size)
+
+        if images is None or num_frames > 1:
+            frame_count = min(num_frames, grid_scores.shape[0])
+            maps = []
+            for i in range(frame_count):
+                grid = grid_scores[i].unsqueeze(0).unsqueeze(0)
+                patch_map = F.interpolate(
+                    grid, size=(image_size, image_size), mode="nearest"
+                )
+                pixel_map = F.interpolate(
+                    patch_map,
+                    size=(orig_h, orig_w),
+                    mode="bilinear",
+                    align_corners=False,
+                ).squeeze(0).squeeze(0)
+                maps.append(pixel_map.cpu().numpy())
+            return {"importance_maps": maps}
+
+        layout = get_dynamic_preprocess_layout(
+            orig_w, orig_h, self.min_dynamic_patch, self.max_dynamic_patch, image_size
+        )
+        grid_w, grid_h, target_width, target_height, blocks = layout
+
+        tile_count = min(blocks, grid_scores.shape[0])
+        canvas = torch.zeros((target_height, target_width), dtype=grid_scores.dtype)
+        for idx in range(tile_count):
+            grid = grid_scores[idx].unsqueeze(0).unsqueeze(0)
+            tile_map = F.interpolate(
+                grid, size=(image_size, image_size), mode="nearest"
+            ).squeeze(0).squeeze(0)
+            row = idx // grid_w
+            col = idx % grid_w
+            y0 = row * image_size
+            x0 = col * image_size
+            canvas[y0:y0 + image_size, x0:x0 + image_size] = tile_map
+
+        tile_pixel_map = F.interpolate(
+            canvas.unsqueeze(0).unsqueeze(0),
+            size=(orig_h, orig_w),
+            mode="bilinear",
+            align_corners=False,
+        ).squeeze(0).squeeze(0)
+
+        thumbnail_map = None
+        if grid_scores.shape[0] > blocks:
+            grid = grid_scores[blocks].unsqueeze(0).unsqueeze(0)
+            thumb = F.interpolate(
+                grid, size=(image_size, image_size), mode="nearest"
+            )
+            thumbnail_map = F.interpolate(
+                thumb,
+                size=(orig_h, orig_w),
+                mode="bilinear",
+                align_corners=False,
+            ).squeeze(0).squeeze(0)
+
+        combined = (
+            torch.maximum(tile_pixel_map, thumbnail_map)
+            if thumbnail_map is not None
+            else tile_pixel_map
+        )
+
+        payload = {"importance_maps": [combined.cpu().numpy()]}
+        payload["importance_tile_map"] = tile_pixel_map.cpu().numpy()
+        if thumbnail_map is not None:
+            payload["importance_thumbnail_map"] = thumbnail_map.cpu().numpy()
+        return payload
+
     def predict_forward(
             self,
             image=None,
@@ -148,6 +306,8 @@ class Sa2VADevChatVisualizeModel(Sa2VADevChatModel):
         if not self.init_prediction_config:
             assert tokenizer
             self.preparing_for_generation(tokenizer=tokenizer)
+
+        images = None
 
         if image is None and video is None and '<image>' not in past_text:
             # TEXT
@@ -298,8 +458,9 @@ class Sa2VADevChatVisualizeModel(Sa2VADevChatModel):
         predict = self.tokenizer.decode(
             generate_output.sequences[0], skip_special_tokens=False).strip()
 
+        output = {'prediction': predict, 'prediction_masks': ret_masks}
         if image is None and video is None and '<image>' not in past_text:
-            return {'prediction': predict, 'prediction_masks': ret_masks, }
+            return output
 
         # if have seg result, find the seg hidden states
         hidden_states = generate_output.hidden_states
@@ -323,7 +484,15 @@ class Sa2VADevChatVisualizeModel(Sa2VADevChatModel):
             masks = masks.cpu().numpy()
             ret_masks.append(masks)
 
-        return {'prediction': predict, 'prediction_masks': ret_masks,}
+        importance_payload = self._build_importance_maps(
+            num_frames=num_frames,
+            ori_image_size=ori_image_size,
+            images=images if video is None else None,
+        )
+        if importance_payload is not None:
+            output.update(importance_payload)
+
+        return output
 
 
 def find_closest_aspect_ratio(aspect_ratio, target_ratios, width, height,
@@ -384,3 +553,24 @@ def dynamic_preprocess(image,
         thumbnail_img = image.resize((image_size, image_size))
         processed_images.append(thumbnail_img)
     return processed_images
+
+
+def get_dynamic_preprocess_layout(orig_width, orig_height, min_num, max_num, image_size):
+    aspect_ratio = orig_width / orig_height
+
+    target_ratios = {(i, j)
+                     for n in range(min_num, max_num + 1)
+                     for i in range(1, n + 1) for j in range(1, n + 1)
+                     if i * j <= max_num and i * j >= min_num}
+    target_ratios = sorted(target_ratios, key=lambda x: x[0] * x[1])
+
+    target_aspect_ratio = find_closest_aspect_ratio(
+        aspect_ratio, target_ratios, orig_width, orig_height, image_size
+    )
+
+    grid_w = target_aspect_ratio[0]
+    grid_h = target_aspect_ratio[1]
+    target_width = image_size * grid_w
+    target_height = image_size * grid_h
+    blocks = grid_w * grid_h
+    return grid_w, grid_h, target_width, target_height, blocks

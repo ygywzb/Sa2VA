@@ -1,9 +1,11 @@
 import argparse
+import gc
 import inspect
 import os
 import types
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.distributed
 import torch.utils.data
@@ -85,6 +87,7 @@ def parse_args():
     parser.add_argument("--deepspeed", type=str, default=None)
     parser.add_argument("--data_root", default="./data", help="Root directory for all datasets.")
     parser.add_argument("--num_workers", type=int, default=8)
+    parser.add_argument("--save_dir", default=None, help="Optional directory to save importance maps.")
     parser.add_argument(
         "--max_samples",
         type=int,
@@ -162,6 +165,15 @@ def apply_visualize_monkey_patch(model):
         Sa2VADevChatVisualizeModel.predict_forward, model
     )
     model.generate = types.MethodType(Sa2VADevChatVisualizeModel.generate, model)
+    model._store_importance_grid = types.MethodType(
+        Sa2VADevChatVisualizeModel._store_importance_grid, model
+    )
+    model._build_visual_token_mappings = types.MethodType(
+        Sa2VADevChatVisualizeModel._build_visual_token_mappings, model
+    )
+    model._build_importance_maps = types.MethodType(
+        Sa2VADevChatVisualizeModel._build_importance_maps, model
+    )
 
     return model
 
@@ -255,7 +267,28 @@ if __name__ == "__main__":
             )
             output = model.predict_forward(**predict_kwargs)
 
+        if args.save_dir and get_rank() == 0 and output is not None:
+            os.makedirs(args.save_dir, exist_ok=True)
+            if "importance_maps" in output:
+                maps = output["importance_maps"]
+                maps_array = np.stack(maps, axis=0) if isinstance(maps, list) else np.asarray(maps)
+                payload = {"importance_maps": maps_array}
+                if "importance_tile_map" in output:
+                    payload["importance_tile_map"] = output["importance_tile_map"]
+                if "importance_thumbnail_map" in output:
+                    payload["importance_thumbnail_map"] = output["importance_thumbnail_map"]
+                save_path = os.path.join(args.save_dir, f"importance_{idx:06d}.npz")
+                np.savez_compressed(save_path, **payload)
+
+        if output is not None:
+            output.pop("importance_maps", None)
+            output.pop("importance_tile_map", None)
+            output.pop("importance_thumbnail_map", None)
         local_results.append(output)
+        del output
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
 
     expected_total = len(dataset) if args.max_samples < 0 else min(args.max_samples, len(dataset))
     all_results = collect_results_cpu(local_results, expected_total)
