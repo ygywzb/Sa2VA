@@ -1,0 +1,27 @@
+\section{Related Work}
+\label{sec:related}
+
+We review three lines of work that are most relevant to our study: (i) dense grounded understanding with multimodal large language models (MLLMs), (ii) segmentation foundation models for images and videos, and (iii) visual token compression and differentiable selection. We further discuss positional encoding choices and assess whether rotary position embedding (RoPE) is a principled fit for token pruning under a train-time differentiable selector and an inference-time hard Top-$k$ operator.
+
+\paragraph{Multimodal LLMs for grounded perception.}
+Recent MLLMs have demonstrated strong general-purpose vision-language reasoning by mapping visual inputs into a language model token space. However, producing \emph{dense} and \emph{grounded} outputs (e.g., pixel-accurate masks aligned with natural language) requires tighter coupling between language understanding and structured vision decoders. A common direction is to augment an MLLM with task-specific heads or external tools, while another is to unify perception outputs (masks, tracks, boxes) as part of an instruction-following pipeline.
+
+\paragraph{Image and video segmentation foundation models.}
+Segmentation foundation models provide high-quality mask prediction and have been extended from images to videos to support temporally consistent object tracking and mask propagation. These models often expose flexible prompt interfaces (e.g., points, boxes, scribbles, or masks) and can serve as strong visual backbones for downstream interactive or language-conditioned segmentation. Our baseline (Sa2VA) follows this trend by marrying a video segmentation foundation model with an MLLM such that the language model can generate instruction tokens to guide the segmentation model for both images and videos.
+
+\paragraph{Referring segmentation and multi-task image/video understanding.}
+Referring segmentation benchmarks study how language expressions ground to pixel-level regions. Extending such grounding to videos adds challenges including temporal ambiguity, appearance changes, and multi-object interactions. Unified models that cover image and video understanding (segmentation + conversation) are appealing because they amortize representation learning and enable a single interface for diverse tasks. Our work is aligned with this direction but focuses on efficiency and token budget: we aim to retain (or improve) dense grounding quality while reducing visual tokens entering the MLLM.
+
+\paragraph{Visual token compression and learnable selection.}
+Token compression aims to reduce the number of visual tokens without sacrificing downstream performance. Representative approaches include pooling/merging, clustered aggregation, sparse attention, and learnable pruning. VisionSelector is closely related to our goal: it proposes a learnable importance scoring for visual features (LIS), a differentiable Top-$k$ operator (DiffTopK) that enables end-to-end training, and a curriculum annealing strategy (CAS) to balance compression-induced loss and task performance. In our setting, token selection is performed \emph{after} Sa2VA unifies image/video features with visual prompt (VP) features, which introduces additional structure compared to VQA-oriented compression that operates on image tokens only.
+
+\paragraph{Differentiable Top-$k$ and train--test mismatch.}
+Hard Top-$k$ selection is non-differentiable and typically introduces a mismatch between training (where gradients are needed) and inference (where discrete pruning is desired). Differentiable relaxations (e.g., continuous gates, soft sorting, or stochastic estimators) enable gradient flow during training, and hard selection can be applied at inference for efficiency. Our design follows this philosophy: DiffTopK is used during training to maintain differentiability, while a standard Top-$k$ is used at inference to realize real token reduction.
+
+\paragraph{Curriculum annealing for multi-objective training.}
+Token compression introduces an auxiliary objective (e.g., sparsity or reconstruction) that competes with downstream task losses. Curriculum-based strategies gradually increase the weight of the compression/selection loss so that the model first learns to solve tasks and then learns to solve them under a tighter token budget. CAS in VisionSelector is an instance of this idea. In our fusion, we treat Sa2VA's conversation and segmentation capabilities as downstream tasks and progressively anneal the relative weight of the LIS-induced selection loss.
+
+\paragraph{Positional encodings under token pruning.}
+Token pruning changes the set of tokens seen by the transformer, so positional encoding choices can affect robustness under varying sequence lengths and sparse token subsets.
+Rotary position embeddings (RoPE) are often used in modern LLMs and can be compatible with inference-time hard Top-$k$ pruning when selected tokens keep consistent positional semantics.
+We defer the concrete design considerations and a best-effort assessment of RoPE under our train-time DiffTopK and inference-time hard Top-$k$ pipeline to \cref{sec:method_rope}.

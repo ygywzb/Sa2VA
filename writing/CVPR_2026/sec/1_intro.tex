@@ -1,0 +1,43 @@
+\section{Introduction}
+\label{sec:intro}
+
+Dense grounded understanding requires models to connect language with fine-grained visual outputs such as pixel-accurate masks over images and videos.
+Recent systems (e.g., Sa2VA) achieve this by coupling a multimodal large language model (MLLM) with a strong segmentation foundation model: the MLLM interprets user instructions and generates intermediate guidance that steers the segmentation model.
+While effective, this paradigm is expensive because dense grounding benefits from high-resolution visual representations and long spatiotemporal contexts, leading to large visual token budgets that inflate memory footprint and latency.
+
+This paper asks a practical question: \emph{can we reduce the number of visual tokens entering the MLLM while preserving (or even improving) dense grounding quality for both segmentation and conversation}? Our answer is affirmative via a simple but crucial fusion design: we perform learnable token selection \emph{after} Sa2VA unifies image/video features with visual prompt (VP) features into a single token stream, and \emph{before} feeding these tokens into the MLLM. This differs from VQA-oriented compression that prunes image tokens only: in our setting, the selector must reason over the fused image/video+VP stream to retain segmentation-critical evidence.
+
+\begin{figure*}[t]
+\centering
+\IfFileExists{figure/framework.pdf}{%
+\includegraphics[width=\textwidth]{figure/framework.pdf}%
+}{%
+\includegraphics[width=\textwidth]{figure/创新图_总.pdf}%
+}
+\caption{Overall framework of Sa2VA-Dev.
+We encode image/video inputs together with visual prompts (VP) into a unified token stream, apply a VP-aware budgeted selection bottleneck before the multimodal LLM (train-time differentiable gating and inference-time hard Top-$k$ pruning), and keep Sa2VA's original task interface for generating text outputs and dense masks.
+}
+\label{fig:framework}
+\end{figure*}
+
+\paragraph{Challenges.}
+Token pruning in dense grounded settings is non-trivial for three reasons.
+First, Sa2VA is inherently multi-task: selection must support both segmentation-oriented supervision (mask quality) and conversation-oriented supervision (language modeling), which can produce competing gradients.
+Second, Sa2VA inputs contain heterogeneous visual evidence, including VP-conditioned tokens created from user prompts (points/boxes/scribbles), so selecting tokens on the \emph{fused} stream is fundamentally different from selecting tokens for VQA-only pipelines.
+Third, discrete Top-$k$ pruning is non-differentiable; a naive training/inference mismatch may harm stability and final quality.
+
+\paragraph{Our approach.}
+We identify the \emph{unified visual token stream} in Sa2VA as the right intervention point for efficiency: it is the first place where (i) long-context image/video evidence and (ii) VP-conditioned evidence co-exist in a single sequence that directly drives the MLLM.
+Sa2VA-Dev places a \emph{budgeted selection bottleneck} precisely at this interface (``append-then-select''), so the selector can be conditioned on VP information \emph{before} pruning and the downstream MLLM sees a shorter yet VP-aligned context.
+We train the selector with a differentiable Top-$k$ surrogate and a curriculum-weighted constraint to reduce the train--test gap between soft gating (training) and hard Top-$k$ pruning (inference), while keeping Sa2VA's multi-task decoding unchanged.
+
+\paragraph{Results preview.}
+On Sa2VA-1B, retaining only the top 30\% visual tokens improves the overall multi-task average to 102.9\% of the baseline, with gains on referring video segmentation (MeViS: 41.7$\rightarrow$47.6; ReVOS: 47.6$\rightarrow$51.3).
+We also observe reduced peak GPU memory (2.76$\rightarrow$2.46 GB) and faster prefill (40.16$\rightarrow$35.14 ms) at 30\% retention.
+
+\paragraph{Contributions.}
+\begin{itemize}
+    \item \textbf{VP-aware selection bottleneck for dense grounding.} We formulate token selection for multi-task dense grounded understanding and identify selecting on the \emph{post-fusion} image/video/VP stream (``append-then-select'') as a VP-consistent interface for budgeted inference in Sa2VA-style systems.
+    \item \textbf{Train--test aligned budgeted selection under multi-task supervision.} We provide a training pipeline with differentiable budgeted gating and a curriculum constraint that improves robustness when switching to inference-time hard Top-$k$ pruning, without modifying Sa2VA's task interface.
+    \item \textbf{Empirical and efficiency evaluation.} We evaluate across image/video referring segmentation and efficiency profiling under multiple retention ratios, and include a protocol (with placeholders where needed) to verify that pruning does not degrade general multimodal conversation ability.
+\end{itemize}

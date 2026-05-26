@@ -1,0 +1,69 @@
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.out
+*.toc
+*.synctex.gz
+*.synctex(busy)
+*.nav
+*.snm
+*.vrb
+*.idx
+*.ilg
+*.ind
+*.bcf
+*.run.xml
+*.acn
+*.acr
+*.alg
+*.glo
+*.glg
+*.gls
+*.ist
+*.xdy
+*.dvi
+*.ps
+*.brf
+
+# LaTeXmk
+latexmkrc
+
+# Temporary/backup files
+*.bak
+*.tmp
+*~
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+
+# Python virtual environments
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Build outputs
+*.pdf
+
+# Paper figures (tracked assets)
+!figure/*.pdf
+!figure/**/*.pdf
+
+# Logs
+*.log
+
+# LDF Images
+paper_pdf/pdf_images/

@@ -1,0 +1,10 @@
+\begin{abstract}
+We study visual token selection for \emph{dense grounded} image and video understanding, where models must jointly support instruction-following conversation and pixel-level outputs under long spatiotemporal contexts.
+We propose \textbf{Sa2VA-Dev}, which introduces a \emph{VP-aware selection bottleneck}: token selection is applied on the \emph{unified} image/video tokens \emph{after} visual-prompt (VP) fusion and \emph{before} the multimodal LLM, enabling end-to-end budgeted inference without changing Sa2VA's task interface.
+We instantiate this bottleneck with (i) a lightweight importance scorer (LIS), (ii) a train-time differentiable budgeted gate (DiffTopK) that aligns with inference-time hard Top-$k$, and (iii) a curriculum (CAS) that stabilizes multi-task optimization under progressively tighter budgets.
+At inference, we switch to standard hard Top-$k$ pruning to obtain real compute/memory savings.
+
+On Sa2VA-1B, our model improves the overall multi-task average to 102.9\% of the baseline while retaining only the top 30\% visual tokens, with notable gains on referring video segmentation (MeViS: 41.7$\rightarrow$47.6; ReVOS: 47.6$\rightarrow$51.3).
+On the Ref-SAV benchmark, our 1B variant reaches 57.6 J\&F, exceeding both Sa2VA-8B (50.0) and zero-shot Sa2VA-8B (41.3) in our evaluation.
+We further observe reduced peak GPU memory (2.76$\rightarrow$2.46 GB) and faster prefill (40.16$\rightarrow$35.14 ms) at 30\% retention, demonstrating a favorable accuracy--efficiency trade-off for dense grounded multimodal understanding.
+\end{abstract}

@@ -1,0 +1,10 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+We presented Sa2VA-Dev, which introduces a VP-aware selection bottleneck for efficient dense grounded image-and-video understanding.
+By performing LIS/DiffTopK/CAS-based selection on the unified image/video/VP token stream \emph{before} the MLLM, our approach reduces the visual token budget while preserving the baseline interface for instruction generation and mask decoding.
+Empirically, we observe a favorable accuracy--efficiency trade-off on Sa2VA-1B on dense grounded benchmarks and efficiency profiling, including improved overall multi-task performance at 30\% retention and reduced peak GPU memory.
+
+\paragraph{Limitations and future work.}
+Our current study is limited to Sa2VA-1B and a small set of retention ratios.
+Future work includes a controlled analysis of positional encoding choices under pruning (e.g., RoPE variants for spatiotemporal tokens), broader scaling to larger backbones, and a more comprehensive system-level profiling of latency under different decoding settings.
