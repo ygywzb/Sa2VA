@@ -50,6 +50,7 @@ All the above points for Sa2VA, plus:
 - inference model code for HF: projects\sa2va\hf\models
 - evaluation code and tools for computing: projects\sa2va\evaluation, tools\eval
 - tools for train and convert: tools\
+- visionselector code in sa2va: projects\sa2va\models\compression_method
 
 ## Abstract: Sa2VA
 This work presents Sa2VA, the first comprehensive, unified model for dense grounded understanding

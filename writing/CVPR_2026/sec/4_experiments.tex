@@ -1,12 +1,8 @@
 \section{Experiments}
 \label{sec:exp}
 
-We evaluate our Sa2VA-Dev token selection on dense grounded understanding benchmarks spanning image referring segmentation, video referring segmentation, and multimodal conversation.
-Unless otherwise specified, results are reported for the Sa2VA-1B baseline and our Sa2VA-1B (ours) variant under different visual token retention ratios.
-
-\paragraph{Evaluation scope and draft status.}
-We evaluate (i) dense grounded accuracy under multiple retention ratios, (ii) matched-budget baselines and ablations that isolate the effect of the VP-aware fusion point and train--test alignment, and (iii) efficiency metrics under a fixed decoding protocol to quantify actual savings.
-To keep the draft fully compilable, some tables/figures are included as placeholders and are explicitly marked as \emph{planned}; we do not base any claims on these placeholders, and we separate measured results from hypotheses.
+We evaluate Sa2VA-Dev on dense grounded understanding benchmarks spanning image referring segmentation, video referring segmentation, and multimodal conversation.
+Unless otherwise specified, we compare the Sa2VA-1B baseline with Sa2VA-1B (ours) under multiple visual token retention ratios.
 
 \subsection{Evaluation setup}
 \paragraph{Retention ratios.}
@@ -21,6 +17,9 @@ For multimodal conversation, we follow standard benchmark protocols (e.g., MME/M
 Table~\ref{tab:train_datasets_seg} summarizes the training datasets used for Sa2VA-Dev finetuning.
 We initialize from a Sa2VA-pretrained checkpoint and finetune only (i) LoRA parameters and (ii) the learnable attention parameters in LIS (e.g., $\mathbf{W}_q,\mathbf{W}_k$ in \eqref{eq:method_lis_qk}), while keeping the remaining backbone parameters frozen.
 We focus on segmentation-related data sources and omit QA-only datasets.
+
+\paragraph{Dataset sampling and repeats.}
+We use a concatenated dataset with repeat factors for each source: RefCOCO/RefCOCO+/RefCOCOg use repeats 5/5/4, and ReVOS/MeViS/Ref-YTVOS/Ref-SAV use repeats 10/4/4/4, respectively. We group batches by modality length to reduce padding variance.
 
 \begin{table}[t]
 \caption{Sa2VA-Dev finetuning datasets (segmentation-related).}
@@ -39,44 +38,26 @@ Video Seg & Ref-YTVOS (3.5K), MeViS (0.6K), ReVOS (1.7K), Ref-SAV (37K) \\
 \end{table}
 
 \paragraph{Implementation details.}
-\TODO{Add: backbone/LLM details, training schedule, optimizer, batch size, tokenization, DiffTopK temperature, CAS schedule parameters, and whether positions are preserved or re-indexed after pruning.}
-
-\paragraph{Compute protocol (recommended for CVPR completeness).}
-For each retention ratio $\rho$, we recommend reporting: visual token count $N$ (or $k$ after pruning), prefill latency, decode latency, peak GPU memory, and throughput (tokens/s).
-To isolate the impact of visual token reduction, keep decoding length fixed across methods and report the average over a fixed prompt set.
+Our backbone is InternVL2.5-1B initialized from the Sa2VA-1B checkpoint; the LLM and visual encoder are frozen. We train LoRA with $r=128$, $\alpha=256$, dropout $0.05$, and a lightweight TransformerScorer (in\_features=896) for LIS. The training budget is set to 0.3 (retain 30\% visual tokens); budgets are adjustable for other retention ratios at inference (e.g., 0.1/0.2/0.3/0.4).
+We train for 1 epoch with per-device batch size 2 and gradient accumulation 4 on 2$\times$A100-SXM4-40GB (about 20 hours). Optimization uses AdamW with lr $4\times10^{-5}$, betas $(0.9,0.999)$, weight decay 0.05, and gradient clipping at 1.0. We use bfloat16 AMP with dynamic loss scaling and 8 dataloader workers.
+The learning-rate schedule applies 5\% linear warmup (start factor $10^{-5}$) followed by cosine annealing to zero. The tokenizer is loaded from the backbone with the \texttt{qwen\_chat} template, max length 8192, right padding, and special tokens [SEG], \texttt{<p>}, \texttt{</p>}, \texttt{<vp>}, \texttt{</vp>}. Images are resized with a 1024 target length. Loss weights are 2.0 for the mask loss and 0.5 for the Dice loss.
+For CAS, we use the default linear schedule with $\lambda_{\mathrm{start}}=0.1$ and $\lambda_{\mathrm{end}}=3.0$ over training steps. DiffTopK uses the default settings without additional hyperparameters.
 
 \subsection{Main results across tasks}
-Table~\ref{tab:main_results} summarizes multi-task performance.
-At 40\% retention, Sa2VA-1B (ours) achieves the best overall average (103.9\% relative to Sa2VA-1B) among the tested budgets.
-We observe consistent gains on video referring segmentation (e.g., MeViS: 41.7$\rightarrow$52.2; ReVOS: 47.6$\rightarrow$51.2), while maintaining comparable image referring segmentation performance.
+We follow the original Sa2VA evaluation protocol without modification and present the main results in Table~\ref{tab:overall_table6_summary} and Table~\ref{tab:image_level_bench_sa2va1b_dev}.
 
-\paragraph{Definition of ``Avg'' (required for reproducibility).}
-\TODO{Specify the aggregation rule for Avg: which tasks are included, the metric for each task, how metrics are normalized (if any), and whether Avg is a macro-average or weighted average.}
+\paragraph{Comparison with strong baselines.}
+Table~\ref{tab:overall_table6_summary} provides a multi-task summary across image/video segmentation and chat benchmarks. With 40\% visual tokens retained (60\% reduction), Sa2VA-1B (ours) shows substantial gains on video referring segmentation (MeViS: 41.7$\rightarrow$52.2; ReVOS: 47.6$\rightarrow$51.2) while maintaining comparable image referring segmentation (RefCOCOg: 72.3$\rightarrow$74.8). Chat benchmarks remain within a narrow range of the baseline, indicating that token reduction does not collapse general vision-language reasoning.
 
-\begin{table}[t]
-\caption{Multi-task comparison between Sa2VA-1B and Sa2VA-1B (ours) under different token retention ratios $\rho$ (higher is better). ``Avg'' denotes the relative aggregate score reported in our logs. ``--'' indicates unavailable results.}
-\label{tab:main_results}
-\centering
-\setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{lccccc}
-\toprule
-Method & $\rho$ & RefCOCOg & MeViS & ReVOS & Avg \\
-\midrule
-Sa2VA-1B & 100\% & 72.3 & 41.7 & 47.6 & 100.0 \\
-Sa2VA-1B (ours) & 40\% & 74.8 & 52.2 & 51.2 & 103.9 \\
-Sa2VA-1B (ours) & 30\% & 74.6 & 47.6 & 51.3 & 102.9 \\
-Sa2VA-1B (ours) & 20\% & 72.3 & 52.1 & -- & 100.9 \\
-Sa2VA-1B (ours) & 10\% & 72.7 & 51.9 & -- & 98.8 \\
-\bottomrule
-\end{tabular}
-\end{table}
+\paragraph{Detailed results and retention sweep.}
+Table~\ref{tab:image_level_bench_sa2va1b_dev} details performance across image-level benchmarks with relative percentages w.r.t. Sa2VA-1B (100\%). At 30--40\% retention, most metrics stay close to the baseline (e.g., MMBench $\approx$96--98\%, SEED $\approx$105--107\%, RefCOCOg $\approx$103\%), while more aggressive pruning (10\%) shows clearer degradation on general QA benchmarks. Overall, 40\% retention provides the best multi-task balance and is selected as the main result point.
 
 \begin{table*}[t]
 \caption{Overall benchmark results (two-column summary, adapted from Table~6).
 We report cIoU for image referring segmentation, J\&F for video referring segmentation, and standard scores for multimodal chat benchmarks.
 For MME, we report perception/cognition as A/B or the total score C(+).
 ``Avg'' is the mean of per-benchmark ratios relative to Sa2VA-1B (100\%), computed over available entries for each method (missing entries are excluded; for MME(A/B) we use A$+$B).
-We select the best retention of Sa2VA-1B (ours) from Table~\ref{tab:main_results} by overall Avg (40\% retention) and report it as our summary row.}
+We select the best retention of Sa2VA-1B (ours) by an internal sweep over retention ratios (40\% retention) and report it as our summary row.}
 \label{tab:overall_table6_summary}
 \centering
 \scriptsize
@@ -135,268 +116,3 @@ Sa2VA-1B (ours, 10\%) & \shortstack{1345/333\\(94.0\%)} & \shortstack{63.0\\(92.
 \end{tabular}%
 }
 \end{table*}
-
-\paragraph{Expected trend (for additional tasks not shown).}
-We expect the unified ``append-then-select'' fusion (selection after image/video/VP unification) to preserve VP-relevant evidence;
-thus, image referring segmentation should remain stable at moderate $\rho$ (e.g., 0.3/0.2), while video referring segmentation tends to benefit more from pruning due to reduced distractors in long contexts.
-
-\subsection{Multimodal conversation benchmarks (planned)}
-\label{sec:exp_mllm_bench}
-CVPR reviewers typically expect that token pruning does not degrade general vision-language reasoning.
-We therefore include a placeholder for standard image and video MLLM benchmarks.
-
-\begin{table}[t]
-\caption{Planned evaluation on multimodal conversation benchmarks (higher is better). Fill with official metrics for the chosen protocol.}
-\label{tab:mllm_bench}
-\centering
-\setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{lcccc}
-\toprule
-Method & $\rho$ & MME & MMBench & SEED \\
-\midrule
-Sa2VA-1B & 100\% & \TODO{--} & \TODO{--} & \TODO{--} \\
-Sa2VA-1B (ours) & 30\% & \TODO{--} & \TODO{--} & \TODO{--} \\
-Sa2VA-1B (ours) & 20\% & \TODO{--} & \TODO{--} & \TODO{--} \\
-Sa2VA-1B (ours) & 10\% & \TODO{--} & \TODO{--} & \TODO{--} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\paragraph{Expected trend.}
-At moderate retention (e.g., $\rho=0.3$), we expect conversation benchmarks to remain comparable to the baseline because the LIS scores emphasize globally informative tokens (\cref{sec:method_lis}) and the CAS objective reduces the train--test gap between $\mathbf{M}_{\mathrm{soft}}$ and $\mathbf{M}_{\mathrm{hard}}$ (\cref{sec:method_cas}).
-
-\subsection{Comparison to alternative token reduction baselines (planned)}
-\label{sec:exp_alt_baselines}
-To strengthen causal claims, we recommend comparing against simple token reduction heuristics that match our inference-time budget $k$.
-These baselines are lightweight to implement and commonly requested by reviewers.
-
-\begin{table}[t]
-\caption{Planned comparison to alternative token reduction baselines at matched budget (higher is better).}
-\label{tab:alt_baselines}
-\centering
-\setlength{\tabcolsep}{3.2pt}
-\begin{tabular}{lccc}
-\toprule
-Strategy & $\rho$ & MeViS & RefCOCOg \\
-\midrule
-Uniform sampling (spatial/temporal) & 30\% & \TODO{--} & \TODO{--} \\
-Random Top-$k$ & 30\% & \TODO{--} & \TODO{--} \\
-Always keep all VP tokens + random fill & 30\% & \TODO{--} & \TODO{--} \\
-LIS score + hard Top-$k$ (no DiffTopK/CAS) & 30\% & \TODO{--} & \TODO{--} \\
-Sa2VA-Dev (LIS+DiffTopK+CAS) & 30\% & 47.6 & 74.6 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\paragraph{Expected trend.}
-We expect random/uniform baselines to underperform due to discarding VP- and object-critical tokens; ``always keep VP'' helps prompt-conditioned tasks but still lacks global saliency reasoning.
-Our LIS+DiffTopK+CAS should yield the best trade-off by learning token importance jointly with downstream objectives.
-
-\subsection{Ref-SAV benchmark}
-On Ref-SAV, our 1B model achieves 56.6--57.6 Overall J\&F across retention ratios (Table~\ref{tab:refsav}), exceeding the reported Sa2VA-8B baseline (50.0) and zero-shot Sa2VA-8B (41.3) in our evaluation.
-
-\paragraph{Evaluation protocol and fairness notes.}
-\TODO{Clarify whether Sa2VA-8B numbers are re-run under the same protocol or quoted from prior reports. State the split, prompt templates, input resolution, decoding length, post-processing, and whether the same segmentation backbone is used.}
-
-\begin{table}[t]
-\caption{Ref-SAV validation results (higher is better). ``zs'' denotes zero-shot testing. We report J, F, and J\&F for Long/Short/Overall subsets.}
-\label{tab:refsav}
-\centering
-\scriptsize
-\setlength{\tabcolsep}{3.0pt}
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{lccccccccc}
-\toprule
-\multirow{2}{*}{Method} & \multicolumn{3}{c}{Long} & \multicolumn{3}{c}{Short} & \multicolumn{3}{c}{Overall} \\
-\cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10}
-& J & F & J\&F & J & F & J\&F & J & F & J\&F \\
-\midrule
-UniRef++ (zs) & 14.1 & 10.8 & 12.5 & 9.0 & 8.2 & 8.6 & 11.6 & 9.5 & 10.5 \\
-UNINEXT (zs) & 11.7 & 8.3 & 10.0 & 5.8 & 4.4 & 5.1 & 8.8 & 6.4 & 7.6 \\
-MeViS (zs) & 12.1 & 7.1 & 11.3 & 6.2 & 5.3 & 5.5 & 12.2 & 9.8 & 10.3 \\
-VISA (zs) & 16.1 & 12.2 & 14.1 & 12.3 & 9.6 & 9.2 & 13.2 & 11.3 & 11.8 \\
-\midrule
-Sa2VA-8B (zs) & 47.7 & 50.9 & 49.3 & 31.5 & 35.0 & 33.3 & 39.6 & 43.0 & 41.3 \\
-Sa2VA-8B (ours) & 57.0 & 60.4 & 58.7 & 39.5 & 42.9 & 41.2 & 48.3 & 51.7 & 50.0 \\
-\midrule
-Sa2VA-1B (ours, 40\%) & 64.1 & 66.3 & 65.2 & 48.4 & 50.7 & 49.6 & 56.3 & 58.5 & 57.4 \\
-Sa2VA-1B (ours, 30\%) & 63.7 & 65.9 & 64.8 & \textbf{49.1} & \textbf{50.9} & \textbf{50.0} & 56.4 & 58.4 & 57.4 \\
-Sa2VA-1B (ours, 20\%) & \textbf{64.5} & \textbf{66.7} & \textbf{65.6} & 48.5 & 50.6 & 49.5 & \textbf{56.5} & \textbf{58.6} & \textbf{57.6} \\
-Sa2VA-1B (ours, 10\%) & 63.4 & 65.6 & 64.5 & 48.0 & 49.6 & 48.8 & 55.7 & 57.6 & 56.6 \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
-
-\subsection{Efficiency analysis}
-We report peak GPU memory, prefill time, and end-to-end latency in Table~\ref{tab:efficiency}.
-At 30\% retention, Sa2VA-1B (ours) reduces peak memory from 2.76 GB to 2.46 GB and improves prefill time from 40.16 ms to 35.14 ms.
-We note that end-to-end latency depends on additional factors (e.g., decoding length and system-level overhead) and is not strictly monotonic in our current measurements.
-
-\begin{table}[t]
-\caption{Efficiency comparison (lower is better).}
-\label{tab:efficiency}
-\centering
-\setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{lcccc}
-\toprule
-Method & $\rho$ & Max GPU (GB) & Prefill (ms) & E2E (ms) \\
-\midrule
-Sa2VA-1B & 100\% & 2.76 & 40.16 & 216.12 \\
-Sa2VA-1B (ours) & 30\% & 2.46 & 35.14 & 243.08 \\
-Sa2VA-1B (ours) & 20\% & 2.42 & 35.64 & 204.96 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\paragraph{Expected trend (extended profiling, planned).}
-With a fixed decoding length, we expect prefill cost and peak memory to decrease monotonically as $\rho$ decreases, since the attention and KV-cache sizes scale with the number of visual tokens.
-We recommend also reporting (i) FLOPs or attention complexity proxies and (ii) tokens-per-second throughput.
-
-\subsection{Ablation studies (planned)}
-\label{sec:exp_ablation}
-To satisfy CVPR-style evidence for each design choice, we plan ablations along three axes: module contributions (LIS/DiffTopK/CAS), insertion point (before vs.
-after VP fusion), and selection training/inference consistency.
-
-\begin{table}[t]
-\caption{Planned ablation of module contributions. Replace placeholders with measured results.}
-\label{tab:ablation_modules}
-\centering
-\setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{lcccc}
-\toprule
-Variant & $\rho$ & RefCOCOg & MeViS & Avg \\
-\midrule
-Sa2VA-1B (no selection) & 100\% & 72.3 & 41.7 & 100.0 \\
-\hline
-LIS + hard Top-$k$ only (no DiffTopK/CAS) & 30\% & \TODO{--} & \TODO{--} & \TODO{--} \\
-LIS + DiffTopK (no CAS) & 30\% & \TODO{--} & \TODO{--} & \TODO{--} \\
-LIS + DiffTopK + CAS (full) & 30\% & 74.6 & 47.6 & 102.9 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\paragraph{Expected trend.}
-We expect (i) DiffTopK to improve training stability and reduce train--test mismatch relative to training with a hard selector, and (ii) CAS to further improve robustness under small $\rho$ by increasing constraint strength gradually.
-
-\begin{table}[t]
-\caption{Planned ablation of the fusion/insertion point. ``Before fusion'' selects visual tokens before appending VP-conditioned tokens; ``after fusion'' is our design.}
-\label{tab:ablation_fusion_point}
-\centering
-\setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{lccc}
-\toprule
-Insertion point & $\rho$ & RefCOCOg & MeViS \\
-\midrule
-Before image/video/VP fusion & 30\% & \TODO{--} & \TODO{--} \\
-After image/video/VP fusion (ours) & 30\% & 74.6 & 47.6 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\paragraph{Expected trend.}
-Selecting \emph{after} fusion should better preserve VP-critical tokens, improving or stabilizing prompt-conditioned segmentation compared to selecting before fusion.
-
-\subsection{Positional encoding and pruning consistency (planned)}
-\label{sec:exp_positional}
-As discussed in \cref{sec:method_rope}, token pruning interacts with positional encoding.
-We recommend evaluating: (i) preserve original positions vs.
-re-index after pruning, and (ii) RoPE vs.
-absolute positions if configurable in the backbone.
-
-\begin{table}[t]
-\caption{Planned positional encoding / indexing ablation under pruning.}
-\label{tab:ablation_positional}
-\centering
-\setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{lccc}
-\toprule
-Setting & $\rho$ & MeViS & Ref-SAV \\
-\midrule
-Preserve original indices + RoPE (default) & 30\% & 47.6 & 57.4 \\
-Re-index after pruning + RoPE & 30\% & \TODO{--} & \TODO{--} \\
-Preserve indices + absolute PE (if available) & 30\% & \TODO{--} & \TODO{--} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\paragraph{Expected trend.}
-We expect ``preserve indices'' to be more consistent with the pre-trained backbone's spatial/temporal semantics; re-indexing may harm temporal alignment for video tokens.
-
-\subsection{Training dynamics and stability (planned)}
-\label{sec:exp_dynamics}
-For differentiable selection methods, reviewers often ask whether the soft mask becomes near-binary and whether the constraint term hurts downstream optimization.
-We propose to report training curves for (i) $\mathcal{L}_{\mathrm{task}}$, (ii) $\mathcal{L}_{\mathrm{constraint}}$ in \eqref{eq:method_total_loss}, and (iii) the mask polarization statistics, e.g., the fraction of tokens with $M_i\in[0,0.1]\cup[0.9,1]$.
-
-\begin{figure}[t]
-\centering
-\fbox{\rule{0pt}{1.05in}\rule{0.95\linewidth}{0pt}}
-\caption{Planned training dynamics.
-Plot $\mathcal{L}_{\mathrm{task}}$ and $\mathcal{L}_{\mathrm{constraint}}$ over steps, together with the CAS weight $\lambda_t$ (\cref{sec:method_cas}).
-\textit{Expected:} as $\lambda_t$ increases, $\mathbf{M}_{\mathrm{soft}}$ becomes more polarized while $\mathcal{L}_{\mathrm{task}}$ remains stable, indicating reduced train--test mismatch without destabilizing learning.}
-\label{fig:training_dynamics}
-\end{figure}
-
-\subsection{Hyperparameter sensitivity (planned)}
-\label{sec:exp_sensitivity}
-We recommend reporting sensitivity to (i) retention ratio $\rho$, (ii) CAS schedule endpoints $(\lambda_{\mathrm{start}},\lambda_{\mathrm{end}})$, and (iii) any score scaling/temperature used in DiffTopK.
-
-\begin{table}[t]
-\caption{Planned sensitivity to CAS schedule. Replace placeholders with measured results.}
-\label{tab:sensitivity_cas}
-\centering
-\setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{lccc}
-\toprule
-Schedule & $\rho$ & MeViS & Ref-SAV \\
-\midrule
-$\lambda_t\equiv 0$ (no constraint) & 30\% & \TODO{--} & \TODO{--} \\
-Linear (default, \cref{eq:method_cas_schedule}) & 30\% & 47.6 & 57.4 \\
-Faster ramp-up (reach $\lambda_{\mathrm{end}}$ at 50\% training) & 30\% & \TODO{--} & \TODO{--} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\paragraph{Expected trend.}
-We expect overly aggressive constraint weighting early in training to hurt $\mathcal{L}_{\mathrm{task}}$ optimization, while a gradual schedule improves inference-time hard Top-$k$ performance by aligning $\mathbf{M}_{\mathrm{soft}}$ and $\mathbf{M}_{\mathrm{hard}}$.
-
-\subsection{Qualitative results and token selection visualization (planned)}
-\label{sec:exp_qual}
-Qualitative evidence is important for dense grounded tasks.
-We recommend two figure types: (i) mask predictions compared to Sa2VA under the same prompts, and (ii) token selection heatmaps showing that kept tokens align with the referred objects or VP regions.
-
-\begin{figure}[t]
-\centering
-\fbox{\rule{0pt}{1.2in}\rule{0.95\linewidth}{0pt}}
-\caption{Planned qualitative comparison on image/video referring segmentation.
-Include: input frame, prompt text, Sa2VA mask, Sa2VA-Dev mask (at $\rho\in\{0.3,0.2\}$), and failure cases.
-\textit{Expected:} at moderate $\rho$, Sa2VA-Dev maintains mask boundaries while reducing spurious regions in cluttered scenes.}
-\label{fig:qual_masks}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\fbox{\rule{0pt}{1.0in}\rule{0.95\linewidth}{0pt}}
-\caption{Planned visualization of LIS scores and token selection.
-Show token-level heatmaps overlaid on frames and indicate selected Top-$k$ tokens.
-\textit{Expected:} selected tokens concentrate on the referred object and VP-conditioned regions, with increased temporal consistency in videos.}
-\label{fig:qual_tokens}
-\end{figure}
-
-\subsection{Accuracy--efficiency trade-off curves (planned)}
-\label{sec:exp_tradeoff}
-Beyond discrete retention points, CVPR papers typically include a trade-off curve.
-We provide a placeholder for plotting performance vs.
-token ratio and performance vs.
-prefill latency.
-
-\begin{figure}[t]
-\centering
-\fbox{\rule{0pt}{1.05in}\rule{0.95\linewidth}{0pt}}
-\caption{Planned accuracy--efficiency trade-off.
-Plot (left) MeViS/Ref-SAV vs.
-$\rho$, and (right) the same metrics vs.
-prefill latency or peak memory.
-\textit{Expected:} a favorable ``knee'' around $\rho\approx0.3$ where efficiency gains are substantial with minimal (or positive) accuracy change.}
-\label{fig:tradeoff}
-\end{figure}

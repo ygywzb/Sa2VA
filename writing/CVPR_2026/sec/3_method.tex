@@ -56,6 +56,7 @@ We encode the masked thumbnail into VP-conditioned tokens and append them to the
 \end{aligned}
 \label{eq:method_unified_tokens}
 \end{equation}
+Here $\mathbf{X}^{\mathrm{vis}}$ includes full image/video tokens and thumbnail tokens, while $\mathbf{X}^{\mathrm{vp}}$ encodes the VP-masked thumbnail; we apply positional encoding after concatenating the full stream.
 For clarity, we denote this fused token stream as $\mathbf{V}$ when describing the token selection modules.
 This ``append-then-select'' design is the key fusion characteristic of Sa2VA-Dev: LIS/DiffTopK operates on the unified image/video/VP token space, ensuring VP-relevant evidence is explicitly represented before pruning.
 
@@ -89,7 +90,7 @@ The soft mask can be interpreted as per-token selection probabilities and inheri
 	[\mathrm{DiffTopK}(\mathbf{s})]_i > [\mathrm{DiffTopK}(\mathbf{s})]_j \Leftrightarrow s_i > s_j.
 	\label{eq:method_difftopk_mono}
 \end{equation}
-We apply the soft mask by element-wise multiplication to suppress non-critical tokens:
+We apply the soft mask by element-wise multiplication to softly scale token magnitudes while keeping gradients:
 \begin{equation}
 	\mathbf{V}_{\mathrm{pruned}} = \mathbf{M}_{\mathrm{soft}} \odot \mathbf{V}.
 	\label{eq:method_pruned_tokens}
@@ -122,7 +123,7 @@ At inference, we apply the standard hard Top-$k$ to obtain a binary mask $\mathb
     \mathbf{M}_{\mathrm{hard}}=\mathrm{TopK}(\mathbf{s}),
     \label{eq:method_hard_topk}
 \end{equation}
-and prune tokens accordingly (equivalently, selecting indices with ones in $\mathbf{M}_{\mathrm{hard}}$).
+and prune tokens accordingly (i.e., selecting indices with ones in $\mathbf{M}_{\mathrm{hard}}$ and re-packing a shorter sequence).
 We evaluate multiple retention ratios (e.g., top 30\%/20\%/10\%) to quantify the trade-off between token budget and task performance, while keeping the Sa2VA baseline interface in \eqref{eq:sa2va_unified_task} unchanged.
 
 \subsection{Curriculum annealing strategy (CAS) for multi-task training}
@@ -149,36 +150,6 @@ The weighting coefficient $\lambda_t$ follows a curriculum annealing schedule fo
 	\label{eq:method_cas_schedule}
 \end{equation}
 
-\subsection{Positional encoding under pruning: is RoPE a good fit?}
+\subsection{Positional encoding (implementation detail)}
 \label{sec:method_rope}
-We discuss RoPE here as a \emph{design consideration} for making hard pruning behave consistently with train-time soft gating.
-RoPE applies a position-dependent rotation to the query/key representations, enabling relative-position-aware attention.
-
-Let $p_t$ denote the positional index (or a tuple of indices) associated with token $\mathbf{x}_t$.
-RoPE can be written as applying a rotation operator $\mathbf{R}(p_t)$:
-\begin{equation}
-	\mathrm{RoPE}(\mathbf{u},p_t) = \mathbf{R}(p_t)\,\mathbf{u}.
-	\label{eq:method_rope_def}
-\end{equation}
-For a transformer layer that computes attention over token embeddings $\mathbf{h}_t$, RoPE is typically applied to queries/keys:
-\begin{equation}
-\begin{aligned}
-	\mathbf{q}_t &= \mathbf{R}(p_t)\,\mathbf{W}_q\mathbf{h}_t,\\
-	\mathbf{k}_t &= \mathbf{R}(p_t)\,\mathbf{W}_k\mathbf{h}_t,\\
-	a_{t,j} &= \mathrm{softmax}_j\Big(\frac{\mathbf{q}_t^{\top}\mathbf{k}_j}{\sqrt{d}}\Big).
-\end{aligned}
-\label{eq:method_rope_attention}
-\end{equation}
-
-\paragraph{What RoPE can help with.}
-When inference uses hard Top-$k$, the sequence length and token subset differ from those seen in training.
-If the surviving tokens keep their original positional indices (rather than being re-indexed densely after pruning), RoPE can help preserve consistent positional semantics across different token subsets.
-This can reduce sensitivity to varying token counts, which is desirable when evaluating multiple retention ratios.
-
-\paragraph{What RoPE cannot solve.}
-RoPE does not address the core source of non-differentiability introduced by hard Top-$k$.
-Differentiability is handled by DiffTopK during training; RoPE is largely orthogonal to this and should be viewed as a compatibility choice in the underlying MLLM rather than a replacement for DiffTopK.
-
-\paragraph{Practical requirements in our setting.}
-To make any RoPE-based claim precise, one must specify: (i) whether RoPE is 1D (sequence) or extended to 2D/spatiotemporal positions, (ii) how appended VP features are assigned positions, and (iii) whether positional indices are preserved for selected tokens at inference.
-Based on these constraints, we treat RoPE as a reasonable positional encoding choice \emph{if already used by the base MLLM}, but we do not rely on RoPE to justify equivalence between near-zero soft gates and discrete token dropping.
+We keep the base MLLM's RoPE. During inference, hard Top-$k$ physically removes low-score visual tokens and the remaining tokens are re-packed into a shorter sequence; positional indices are therefore generated on the compressed sequence by the base model (we do not pass custom position IDs). This choice is orthogonal to LIS/DiffTopK/CAS and is reported only as an implementation detail.
