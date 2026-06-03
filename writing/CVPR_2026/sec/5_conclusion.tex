@@ -1,8 +1,8 @@
 \section{Conclusion}
 \label{sec:conclusion}
 
-We presented Sa2VA-Dev, which introduces a VP-aware selection bottleneck for efficient dense grounded image-and-video understanding.
-By performing LIS/DiffTopK/CAS-based selection on the unified image/video/VP token stream \emph{before} the MLLM, our approach reduces the visual token budget while preserving the baseline interface for instruction generation and mask decoding.
+We presented Sa2VA-Dev, which learns to retain visual features that best support \texttt{[SEG]} generation for dense grounded image-and-video understanding.
+By training LIS/DiffTopK/CAS on Sa2VA's unified visual stream, we reduce the visual token budget while keeping the baseline task interface and improving the quality of segmentability cues used by SAM2.
 Empirically, we observe a favorable accuracy--efficiency trade-off on Sa2VA-1B on dense grounded benchmarks and efficiency profiling, including improved overall multi-task performance at 30\% retention and reduced peak GPU memory.
 
 \paragraph{Limitations and future work.}

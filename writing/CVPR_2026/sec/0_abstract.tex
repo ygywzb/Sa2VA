@@ -1,7 +1,8 @@
 \begin{abstract}
 We study visual token selection for \emph{dense grounded} image and video understanding, where models must jointly support instruction-following conversation and pixel-level outputs under long spatiotemporal contexts.
-We propose \textbf{Sa2VA-Dev}, which introduces a \emph{VP-aware selection bottleneck}: token selection is applied on the \emph{unified} image/video tokens \emph{after} visual-prompt (VP) fusion and \emph{before} the multimodal LLM, enabling end-to-end budgeted inference without changing Sa2VA's task interface.
-We instantiate this bottleneck with (i) a lightweight importance scorer (LIS), (ii) a train-time differentiable budgeted gate (DiffTopK) that aligns with inference-time hard Top-$k$, and (iii) a curriculum (CAS) that stabilizes multi-task optimization under progressively tighter budgets.
+We propose \textbf{Sa2VA-Dev}, which learns to retain visual features that best support the generation of \texttt{[SEG]} tokens---intermediate segmentability cues understood by SAM2---while reducing the visual token budget.
+Our selector is instantiated with (i) a lightweight importance scorer (LIS), (ii) a train-time differentiable budgeted gate (DiffTopK) that aligns with inference-time hard Top-$k$, and (iii) a curriculum (CAS) that stabilizes multi-task optimization under progressively tighter budgets.
+For compatibility with Sa2VA, selection is applied on the unified image/video+VP stream \emph{after} fusion and \emph{before} the multimodal LLM, without changing the baseline task interface.
 At inference, we switch to standard hard Top-$k$ pruning to obtain real compute/memory savings.
 
 On Sa2VA-1B, our model improves the overall multi-task average to 102.9\% of the baseline while retaining only the top 30\% visual tokens, with notable gains on referring video segmentation (MeViS: 41.7$\rightarrow$47.6; ReVOS: 47.6$\rightarrow$51.3).

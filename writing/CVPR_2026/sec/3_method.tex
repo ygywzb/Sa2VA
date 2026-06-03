@@ -1,15 +1,13 @@
 \section{Method}
 \label{sec:method}
 
-We present Sa2VA-Dev, which introduces a \emph{VP-aware selection bottleneck} in Sa2VA.
-Our goal is to reduce the number of visual tokens consumed by the large language model while maintaining (or improving) dense grounded outputs such as referring segmentation; we instantiate the bottleneck using LIS/DiffTopK/CAS following prior differentiable selection designs.
+We present Sa2VA-Dev, which equips Sa2VA with a learnable visual token selector to retain features that best support \texttt{[SEG]} generation---the intermediate \emph{segmentability cues} consumed by SAM2.
+The selector is trained with LIS/DiffTopK/CAS and applied to the unified visual stream produced by Sa2VA's multimodal fusion, without altering the baseline task interface.
 
 
 \subsection{Overview}
 \label{sec:method_overview}
-Sa2VA-Dev targets a setting that is not covered by typical VQA-oriented pruning: \emph{dense grounded multi-tasking} where the same model must support (i) pixel-level mask prediction and (ii) language generation, and where additional \emph{visual prompts} (points/boxes/scribbles) inject task-critical evidence. We therefore compress the \emph{fused} image/video+VP token stream, rather than image tokens alone, so the selector can directly attend to VP-conditioned cues that drive segmentation.
-Our key design is a \textbf{VP-aware selection bottleneck}: we apply budgeted token selection on the \emph{unified} visual token sequence obtained \emph{after} fusing image/video tokens with VP-derived tokens, but \emph{before} the sequence is consumed by the LLM.
-This ``append-then-select'' interface makes the selector explicitly conditioned on VP information and allows the downstream LLM to operate on a shorter, VP-aligned context while preserving Sa2VA's original task interface.
+Sa2VA-Dev targets \emph{dense grounded multi-tasking}, where the same model must support pixel-level mask prediction and language generation. Sa2VA fuses text tokens with image/video features and visual prompts (points/boxes/scribbles), and the LLM emits \texttt{[SEG]} tokens that act as segmentability cues for SAM2 (distinct from the input VPs). Our selector operates on the fused visual stream to preserve features that are most helpful for \texttt{[SEG]} generation, while reducing the token budget consumed by the LLM.
 
 Following the baseline abstraction, for an instance $i$ with input text tokens $T_i$, image/video input (denoted as $I_i$ or $V_i$), and additional visual prompt tokens $VP_i$, the model outputs answer tokens $T_o$ and optionally masks (or masklets) $M_o$:
 \begin{equation}
@@ -32,11 +30,8 @@ We use a retention ratio $\rho\in(0,1]$ and set the token budget as
 	\label{eq:method_token_budget}
 \end{equation}
 
-\subsection{VP-to-feature conversion and unified visual feature stream}
-\label{sec:method_vp}
-Sa2VA supports visual prompts such as points, boxes, and scribbles.
-We first rasterize VP into a binary mask $\mathbf{M}\in\{0,1\}^{H\times W}$ in the original resolution.
-We then downsample the image (or each video frame) into a thumbnail view and apply an element-wise mask multiplication:
+\paragraph{Unified visual feature stream (Sa2VA baseline).}
+Sa2VA converts visual prompts into a binary mask $\mathbf{M}\in\{0,1\}^{H\times W}$ and forms VP-conditioned tokens by masking a downsampled thumbnail:
 \begin{equation}
 \begin{aligned}
 	\bar{\mathcal{I}} &= \mathrm{Down}(\mathcal{I}) \in \mathbb{R}^{\bar{H}\times\bar{W}\times 3},\\
@@ -47,7 +42,7 @@ We then downsample the image (or each video frame) into a thumbnail view and app
 \end{equation}
 where $\odot$ denotes broadcasting element-wise multiplication.
 
-We encode the masked thumbnail into VP-conditioned tokens and append them to the original Sa2VA visual tokens:
+We then encode the masked thumbnail and append it to the original Sa2VA visual tokens:
 \begin{equation}
 \begin{aligned}
 	\mathbf{X}^{\mathrm{vis}} &= \mathrm{Enc}(\mathcal{I}\ \text{or}\ \mathcal{V}) \in \mathbb{R}^{T_{\mathrm{vis}}\times d},\\
@@ -58,11 +53,10 @@ We encode the masked thumbnail into VP-conditioned tokens and append them to the
 \end{equation}
 Here $\mathbf{X}^{\mathrm{vis}}$ includes full image/video tokens and thumbnail tokens, while $\mathbf{X}^{\mathrm{vp}}$ encodes the VP-masked thumbnail; we apply positional encoding after concatenating the full stream.
 For clarity, we denote this fused token stream as $\mathbf{V}$ when describing the token selection modules.
-This ``append-then-select'' design is the key fusion characteristic of Sa2VA-Dev: LIS/DiffTopK operates on the unified image/video/VP token space, ensuring VP-relevant evidence is explicitly represented before pruning.
 
 \subsection{Learnable importance scoring (LIS)}
 \label{sec:method_lis}
-Given the fused visual tokens $\mathbf{V}\in\mathbb{R}^{N\times D}$, LIS predicts an importance score $s_i$ for each token $i$.
+Given the fused visual tokens $\mathbf{V}\in\mathbb{R}^{N\times D}$, LIS predicts an importance score $s_i$ for each token $i$, aiming to retain features that better support \texttt{[SEG]} generation and SAM2 segmentability cues.
 Following the simplified self-attention scoring form in VisionSelector, we compute
 \begin{equation}
 	\mathbf{Q}=\mathbf{V}\mathbf{W}_{q},\quad \mathbf{K}=\mathbf{V}\mathbf{W}_{k},
