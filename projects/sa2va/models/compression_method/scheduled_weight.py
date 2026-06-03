@@ -42,11 +42,12 @@ from mmengine.dist import get_rank
 
 @HOOKS.register_module()
 class ScheduledWeightHook(Hook):
-    def __init__(self, reg_weight_start=0.1, reg_weight_end=3.0, log_interval=10, ablation=False):
+    def __init__(self, reg_weight_start=0.1, reg_weight_end=3.0, log_interval=10, ablation=False, fixed:float=None):
         self.reg_weight_start = reg_weight_start
         self.reg_weight_end = reg_weight_end
         self.log_interval = log_interval
         self.ablation = ablation
+        self.fixed = fixed
 
     def before_train_iter(self, runner: FlexibleRunner, batch_idx, data_batch=None):
         total_steps = runner.max_iters
@@ -71,6 +72,10 @@ class ScheduledWeightHook(Hook):
         # ablation
         if self.ablation:
             current_weight = 1.0
+        
+        # fixed
+        if self.fixed is not None:
+            current_weight=self.fixed
 
         actual_model.regularization_weight = current_weight
 

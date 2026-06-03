@@ -1,4 +1,5 @@
 # internvl2.5-1b 30% budgets
+# ablation: CAS lambda: 0.1~1
 from mmengine.hooks import (
     CheckpointHook,
     DistSamplerSeedHook,
@@ -25,7 +26,7 @@ from projects.sa2va.models import (
     Sa2VAModelDev,
     SAM2TrainRunner,
     DirectResize,
-    InternVLMLLM_Train,
+    InternVLMLLM_Train_Dev,
 )
 from projects.sa2va.datasets import (
     sa2va_collect_fn,
@@ -94,7 +95,7 @@ model = dict(
     loss_sample_points=True,
     frozen_sam2_decoder=False,
     mllm=dict(
-        type=InternVLMLLM_Train,
+        type=InternVLMLLM_Train_Dev,
         use_flash_attn=True,
         model_path=path,
         freeze_llm=True,
@@ -108,14 +109,14 @@ model = dict(
             task_type="CAUSAL_LM",
             modules_to_save=["embed_tokens", "lm_head"],
         ),
-        # # 896维，中间已经映射到了llm的维度
-        # # 其他参数默认
-        # importance_scorer=dict(
-        #     type=TransformerScorer,
-        #     in_features=896,
-        # ),
-        # # 预算，只拿30%的最重要特征
-        # budgets=0.3,
+        # 896维，中间已经映射到了llm的维度
+        # 其他参数默认
+        importance_scorer=dict(
+            type=TransformerScorer,
+            in_features=896,
+        ),
+        # 预算，只拿30%的最重要特征
+        budgets=0.3,
     ),
     tokenizer=tokenizer,
     grounding_encoder=dict(
@@ -302,7 +303,7 @@ train_cfg = dict(type=TrainLoop, max_epochs=max_epochs)
 #######################################################################
 # Log the dialogue periodically during the training process, optional
 custom_hooks = [
-    dict(type=ScheduledWeightHook, log_interval=10),
+    dict(type=ScheduledWeightHook, reg_weight_end=1.0, log_interval=10),
 ]
 
 # configure default hooks
