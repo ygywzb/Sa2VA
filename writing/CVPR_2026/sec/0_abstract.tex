@@ -1,6 +1,6 @@
 \begin{abstract}
 We study visual token selection for \emph{dense grounded} image and video understanding, where models must jointly support instruction-following conversation and pixel-level outputs under long spatiotemporal contexts.
-We propose \textbf{Sa2VA-Dev}, which learns to retain visual features that best support the generation of \texttt{[SEG]} tokens---intermediate segmentability cues understood by SAM2---while reducing the visual token budget.
+We propose \textbf{Sa2VA-Select}, which learns to retain visual features that best support the generation of \texttt{[SEG]} tokens---intermediate segmentability cues understood by SAM2---while reducing the visual token budget.
 Our selector is instantiated with (i) a lightweight importance scorer (LIS), (ii) a train-time differentiable budgeted gate (DiffTopK) that aligns with inference-time hard Top-$k$, and (iii) a curriculum (CAS) that stabilizes multi-task optimization under progressively tighter budgets.
 For compatibility with Sa2VA, selection is applied on the unified image/video+VP stream \emph{after} fusion and \emph{before} the multimodal LLM, without changing the baseline task interface.
 At inference, we switch to standard hard Top-$k$ pruning to obtain real compute/memory savings.

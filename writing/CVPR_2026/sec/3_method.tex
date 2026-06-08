@@ -1,13 +1,13 @@
 \section{Method}
 \label{sec:method}
 
-We present Sa2VA-Dev, which equips Sa2VA with a learnable visual token selector to retain features that best support \texttt{[SEG]} generation---the intermediate \emph{segmentability cues} consumed by SAM2.
+We present Sa2VA-Select, which equips Sa2VA with a learnable visual token selector to retain features that best support \texttt{[SEG]} generation---the intermediate \emph{segmentability cues} consumed by SAM2.
 The selector is trained with LIS/DiffTopK/CAS and applied to the unified visual stream produced by Sa2VA's multimodal fusion, without altering the baseline task interface.
 
 
 \subsection{Overview}
 \label{sec:method_overview}
-Sa2VA-Dev targets \emph{dense grounded multi-tasking}, where the same model must support pixel-level mask prediction and language generation. Sa2VA fuses text tokens with image/video features and visual prompts (points/boxes/scribbles), and the LLM emits \texttt{[SEG]} tokens that act as segmentability cues for SAM2 (distinct from the input VPs). Our selector operates on the fused visual stream to preserve features that are most helpful for \texttt{[SEG]} generation, while reducing the token budget consumed by the LLM.
+Sa2VA-Select targets \emph{dense grounded multi-tasking}, where the same model must support pixel-level mask prediction and language generation. Sa2VA fuses text tokens with image/video features and visual prompts (points/boxes/scribbles), and the LLM emits \texttt{[SEG]} tokens that act as segmentability cues for SAM2 (distinct from the input VPs). Our selector operates on the fused visual stream to preserve features that are most helpful for \texttt{[SEG]} generation, while reducing the token budget consumed by the LLM.
 
 Following the baseline abstraction, for an instance $i$ with input text tokens $T_i$, image/video input (denoted as $I_i$ or $V_i$), and additional visual prompt tokens $VP_i$, the model outputs answer tokens $T_o$ and optionally masks (or masklets) $M_o$:
 \begin{equation}

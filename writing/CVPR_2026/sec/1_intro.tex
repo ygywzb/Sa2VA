@@ -14,7 +14,7 @@ This paper asks a practical question: \emph{can we reduce the number of visual t
 }{%
 \includegraphics[width=\textwidth]{figure/创新图_总.pdf}%
 }
-\caption{Overall framework of Sa2VA-Dev.
+\caption{Overall framework of Sa2VA-Select.
 We encode image/video inputs together with visual prompts (VP) into a unified token stream, apply a budgeted selection module before the multimodal LLM (train-time differentiable gating and inference-time hard Top-$k$ pruning), and keep Sa2VA's original task interface where \texttt{[SEG]} tokens act as segmentability cues for SAM2.
 }
 \label{fig:framework}
@@ -28,7 +28,7 @@ Third, discrete Top-$k$ pruning is non-differentiable; a naive training/inferenc
 
 \paragraph{Our approach.}
 We identify the \emph{unified visual token stream} in Sa2VA as the right intervention point for efficiency: it is the first place where long-context image/video evidence and VP-conditioned evidence co-exist and directly drive \texttt{[SEG]} token generation.
-Sa2VA-Dev places a budgeted selection module at this interface (``append-then-select'') so the selector can learn which features most improve \texttt{[SEG]} quality before pruning, while the downstream MLLM sees a shorter context.
+Sa2VA-Select places a budgeted selection module at this interface (``append-then-select'') so the selector can learn which features most improve \texttt{[SEG]} quality before pruning, while the downstream MLLM sees a shorter context.
 We train the selector with a differentiable Top-$k$ surrogate and a curriculum-weighted constraint to reduce the train--test gap between soft gating (training) and hard Top-$k$ pruning (inference), while keeping Sa2VA's multi-task decoding unchanged.
 
 \paragraph{Results preview.}
