@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import inspect
 from pathlib import Path
 
 import mmengine
@@ -210,16 +211,20 @@ if __name__ == '__main__':
     )
     results = []
     executor = concurrent.futures.ThreadPoolExecutor()
+    predict_forward_params = inspect.signature(model.predict_forward).parameters
     for idx, item in enumerate(tqdm.tqdm(dataloader)):
         if args.max_samples > 0 and idx >= args.max_samples:
             break
         with torch.no_grad():
-            result = model.predict_forward(
-                video=item['images'],
-                text=item['text_prompt'],
-                tokenizer=tokenizer,
-                processor=processor,
-            )
+            predict_forward_kwargs = {
+                'video': item['images'],
+                'text': item['text_prompt'],
+                'tokenizer': tokenizer,
+            }
+            if 'processor' in predict_forward_params and processor is not None:
+                predict_forward_kwargs['processor'] = processor
+            result = model.predict_forward(**predict_forward_kwargs)
+            
 
         text_idx = 0
         text_prediction = result['prediction']
