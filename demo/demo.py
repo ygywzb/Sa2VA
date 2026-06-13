@@ -1,8 +1,9 @@
 import argparse
 import os
+from pathlib import Path
 
 from PIL import Image
-from transformers import AutoModelForCausalLM, AutoTokenizer, AutoProcessor, AutoConfig
+from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer, AutoProcessor, AutoConfig
 
 import torch
 
@@ -75,15 +76,40 @@ def visualize(pred_mask, image_path, work_dir):
     output_path = os.path.join(work_dir, os.path.basename(image_path))
     cv2.imwrite(output_path, visual_result)
 
+def load_model_with_fallback(model_path):
+    try:
+        model = AutoModel.from_pretrained(
+            model_path,
+            torch_dtype=torch.bfloat16,
+            low_cpu_mem_usage=True,
+            use_flash_attn=True,
+            trust_remote_code=True,
+        ).eval().cuda()
+        return model
+    except FileNotFoundError as err:
+        local_modeling_file = Path(model_path) / 'modeling_sa2va_dev_chat.py'
+        if not local_modeling_file.exists():
+            raise err
+
+        from projects.sa2va.hf.models.modeling_sa2va_dev_chat import Sa2VADevChatModel
+
+        model = Sa2VADevChatModel.from_pretrained(
+            model_path,
+            torch_dtype=torch.bfloat16,
+            low_cpu_mem_usage=True,
+        ).eval().cuda()
+        return model
+
 if __name__ == "__main__":
     cfg = parse_args()
     model_path = cfg.model_path
-    model = AutoModelForCausalLM.from_pretrained(
-        model_path,
-        torch_dtype="auto",
-        #device_map="auto",
-        trust_remote_code=True
-    )
+    # model = AutoModelForCausalLM.from_pretrained(
+    #     model_path,
+    #     torch_dtype="auto",
+    #     #device_map="auto",
+    #     trust_remote_code=True
+    # )
+    model = load_model_with_fallback(model_path)
     """
     # For distributed inference, uncomment the following lines to get device_map
     device_map=split_model(model_path)
