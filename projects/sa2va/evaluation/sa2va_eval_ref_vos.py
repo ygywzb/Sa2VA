@@ -77,6 +77,12 @@ DATASETS_INFO = {
         'expression_file': 'data/video_datas/rvos/meta_expressions/valid/meta_expressions.json',
         'mask_file': None,
     },
+    'REFYTVOS_LOCAL': {
+        'data_root': 'data/video_datas/rvos/',
+        'image_folder': 'data/video_datas/rvos/valid_local/JPEGImages/',
+        'expression_file': 'data/video_datas/rvos/valid_local/meta_expressions_challenge.json',
+        'mask_file': None,
+    },
     'REVOS': {
         'data_root': 'data/video_datas/revos/',
         'image_folder': 'data/video_datas/revos/',
