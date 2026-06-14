@@ -29,6 +29,13 @@ def load_mask(mask_path):
     return (mask > 0).astype(np.uint8)
 
 
+def load_mask_with_size(mask_path, size):
+    mask = Image.open(mask_path).convert("L")
+    if mask.size != size:
+        mask = mask.resize(size, Image.NEAREST)
+    return (np.array(mask, dtype=np.uint8) > 0).astype(np.uint8)
+
+
 def get_prediction_root(pred_path):
     pred_path = Path(pred_path)
     if pred_path.is_dir() and pred_path.name == "Annotations":
@@ -72,7 +79,7 @@ def eval_queue(q, rank, out_dict):
                 raise FileNotFoundError(f"Missing prediction mask: {pred_mask_path}")
 
             gt_masks[frame_idx] = load_mask(gt_mask_path)
-            pred_masks[frame_idx] = load_mask(pred_mask_path)
+            pred_masks[frame_idx] = load_mask_with_size(pred_mask_path, (w, h))
 
         j = db_eval_iou(gt_masks, pred_masks).mean()
         f = db_eval_boundary(gt_masks, pred_masks).mean()
