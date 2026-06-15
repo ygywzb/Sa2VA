@@ -45,8 +45,8 @@ This design lets us study whether learnable token selection can be transferred e
 
 \paragraph{Results preview.}
 Experiments show that learnable token selection remains effective in this more demanding setting.
-On Sa2VA-1B, retaining only the top 30\% visual tokens improves referring video segmentation on MeViS from 41.7 to 47.6 and on ReVOS from 47.6 to 51.3, while also reducing peak GPU memory from 2.76 to 2.46 GB and prefill time from 40.16 to 35.14 ms.
-Across multiple retention ratios, we observe that moderate token reduction largely preserves the baseline's joint segmentation-and-conversation capability, and in several cases improves dense grounding performance rather than merely maintaining it.
+On Sa2VA-1B, moderate token reduction preserves the baseline's joint segmentation-and-conversation capability and improves several dense grounding benchmarks, such as ReVOS and RefCOCOg, while also reducing peak GPU memory and prefill time.
+Across multiple retention ratios, we observe that token reduction can improve selected dense grounding results rather than merely maintaining them.
 
 \paragraph{Contributions.}
 \begin{itemize}

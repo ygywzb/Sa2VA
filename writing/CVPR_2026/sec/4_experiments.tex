@@ -12,8 +12,9 @@ This sweep lets us study not only the best operating point, but also the broader
 
 \paragraph{Tasks and metrics.}
 For image referring segmentation, we report cIoU on RefCOCO, RefCOCO+, and RefCOCOg.
-For video referring segmentation, we report J\&F on MeViS and Ref-SAV, and include Ref-DAVIS17 when available.
-For multimodal conversation, we follow standard benchmark protocols, including MME, MMBench, SEED-Bench, and their video counterparts.
+For video referring segmentation, we report J\&F on Ref-DAVIS17 and Ref-SAV in the current manuscript, while MeViS (val\_u) is used in the efficiency analysis.
+For multimodal conversation, we follow standard benchmark protocols, including MME, MMBench, SEED-Bench, AI2D, MMStar, MMMU, SQA$^{\mathrm{test}}$, and their video counterparts.
+For benchmarks not reported in the original Sa2VA paper, including AI2D, MMStar, MMMU, and SQA$^{\mathrm{test}}$, we evaluate the Sa2VA-1B baseline under the same local setup used for Sa2VA-Select.
 Together, these tasks cover the two capabilities that are most relevant to our setting: dense grounding quality and general multimodal reasoning.
 
 \paragraph{Training datasets and finetuning scope.}
@@ -62,10 +63,9 @@ Overall, the results support a consistent conclusion: learnable token selection 
 
 \paragraph{Comparison with strong baselines.}
 Table~\ref{tab:overall_table6_summary} presents a summary across image segmentation, video segmentation, and chat-oriented benchmarks.
-Compared with Sa2VA-1B, Sa2VA-Select-1B at 40\% retention improves several dense grounding results, especially on video referring segmentation, where MeViS rises from 41.7 to 52.2 and ReVOS from 47.6 to 51.2.
-At the same time, image referring segmentation remains competitive, with RefCOCOg improving from 72.3 to 74.8.
+Compared with Sa2VA-1B, Sa2VA-Select-1B at 40\% retention improves image referring segmentation on RefCOCOg from 72.3 to 74.8 and video referring segmentation on ReVOS from 47.6 to 51.2, while remaining competitive on Ref-DAVIS17 (72.3 to 71.0).
 The chat benchmarks stay close to the baseline overall, suggesting that moderate visual token reduction does not collapse general multimodal reasoning even in a unified model.
-These observations are important because they indicate that compression is not merely tolerable in this setting, but can also coincide with improved dense grounding performance.
+These observations indicate that token reduction can preserve broad multi-task ability while still improving selected dense grounding benchmarks.
 
 \paragraph{Detailed results and retention sweep.}
 Table~\ref{tab:image_level_bench_sa2va1b_dev} provides a more detailed retention sweep on image-level benchmarks.
@@ -79,37 +79,37 @@ In the remainder of the paper, we therefore interpret 30--40\% retention as the 
 We report cIoU for image referring segmentation, J\&F for video referring segmentation, and standard scores for multimodal chat benchmarks.
 For MME, we report perception/cognition as A/B or the total score C(+).
 ``Avg'' is the mean of per-benchmark ratios relative to Sa2VA-1B (100\%), computed over available entries for each method (missing entries are excluded; for MME(A/B) we use A$+$B).
-We select the best retention of Sa2VA-Select-1B by an internal sweep over retention ratios (40\% retention) and report it as our summary row.}
+We temporarily exclude the main MeViS column here because our current development results are on MeViS (val\_u) rather than the standard MeViS evaluation split. The ``Avg for Sa2VA-1B and Sa2VA-Select-1B is therefore computed over the currently reported columns in this table.}
 \label{tab:overall_table6_summary}
 \centering
 \scriptsize
 \setlength{\tabcolsep}{2.2pt}
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{lccccccccccc}
+\begin{tabular}{lcccccccccc}
 \toprule
-\multirow{2}{*}{Method} & \multicolumn{3}{c}{Image Seg (cIoU)} & \multicolumn{3}{c}{Video Seg (J\&F)} & \multicolumn{3}{c}{Image Chat} & \multicolumn{1}{c}{Video Chat} & \multirow{2}{*}{Avg} \\
-\cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10} \cmidrule(lr){11-11}
-& RefCOCO & RefCOCO+ & RefCOCOg & MeViS & Ref-DAVIS17 & ReVOS & MME (A/B,+) & MMBench & SEED & Video-MME & \\
+\multirow{2}{*}{Method} & \multicolumn{3}{c}{Image Seg (cIoU)} & \multicolumn{2}{c}{Video Seg (J\&F)} & \multicolumn{3}{c}{Image Chat} & \multicolumn{1}{c}{Video Chat} & \multirow{2}{*}{Avg} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-6} \cmidrule(lr){7-9} \cmidrule(lr){10-10}
+& RefCOCO & RefCOCO+ & RefCOCOg & Ref-DAVIS17 & ReVOS & MME (A/B,+) & MMBench & SEED & Video-MME & \\
 \midrule
-LLaVA-1.5-13B & -- & -- & -- & -- & -- & -- & 1531(+) & 68.8 & 70.1 & -- & 98.2 \\
-Video-LLaVA-7B & -- & -- & -- & -- & -- & -- & -- & 60.9 & -- & 39.9 & 94.6 \\
-LLaMA-VID-7B & -- & -- & -- & -- & -- & -- & 1521(+) & 65.1 & 59.9 & -- & 91.0 \\
-mPLUG-Owl3-8B & -- & -- & -- & -- & -- & -- & -- & 77.6 & -- & 53.5 & 123.9 \\
-InternVL2-8B & -- & -- & -- & -- & -- & -- & -- & 81.7 & 76.2 & 54.0 & 124.2 \\
+LLaVA-1.5-13B & -- & -- & -- & -- & -- & 1531(+) & 68.8 & 70.1 & -- & 98.2 \\
+Video-LLaVA-7B & -- & -- & -- & -- & -- & -- & 60.9 & -- & 39.9 & 94.6 \\
+LLaMA-VID-7B & -- & -- & -- & -- & -- & 1521(+) & 65.1 & 59.9 & -- & 91.0 \\
+mPLUG-Owl3-8B & -- & -- & -- & -- & -- & -- & 77.6 & -- & 53.5 & 123.9 \\
+InternVL2-8B & -- & -- & -- & -- & -- & -- & 81.7 & 76.2 & 54.0 & 124.2 \\
 \midrule
-PixelLM-7B & 73.0 & 66.3 & 69.3 & -- & -- & -- & 309/135 & 17.4 & -- & -- & 67.1 \\
-LaSagnA & 76.8 & 66.4 & 70.6 & -- & -- & -- & 0/0 & 0.0 & -- & -- & 58.4 \\
-LISA-7B & 74.1 & 62.4 & 66.4 & -- & -- & -- & 1/1 & 0.4 & -- & -- & 55.5 \\
-GLaMM-7B & 79.5 & 72.6 & 74.2 & -- & -- & -- & 14/9 & 36.8 & -- & -- & 72.9 \\
-LLaVA-G-7B & 77.1 & 68.8 & 71.5 & -- & -- & -- & -- & -- & -- & -- & 99.0 \\
-GSVA-13B & 79.2 & 70.3 & 75.7 & -- & -- & -- & -- & -- & -- & -- & 102.5 \\
-OMG-LLaVA-7B & 78.0 & 69.1 & 72.9 & -- & -- & -- & 1177/235 & 47.9 & 56.5 & -- & 89.5 \\
-VideoLISA-3.8B & 73.8 & 63.4 & 68.3 & 44.4 & 68.8 & -- & -- & -- & -- & -- & 96.4 \\
-VISA-13B & 72.4 & 59.8 & 65.5 & 44.5 & 70.4 & 50.9 & -- & -- & -- & -- & 96.8 \\
+PixelLM-7B & 73.0 & 66.3 & 69.3 & -- & -- & 309/135 & 17.4 & -- & -- & 67.1 \\
+LaSagnA & 76.8 & 66.4 & 70.6 & -- & -- & 0/0 & 0.0 & -- & -- & 58.4 \\
+LISA-7B & 74.1 & 62.4 & 66.4 & -- & -- & 1/1 & 0.4 & -- & -- & 55.5 \\
+GLaMM-7B & 79.5 & 72.6 & 74.2 & -- & -- & 14/9 & 36.8 & -- & -- & 72.9 \\
+LLaVA-G-7B & 77.1 & 68.8 & 71.5 & -- & -- & -- & -- & -- & -- & 99.0 \\
+GSVA-13B & 79.2 & 70.3 & 75.7 & -- & -- & -- & -- & -- & -- & 102.5 \\
+OMG-LLaVA-7B & 78.0 & 69.1 & 72.9 & -- & -- & 1177/235 & 47.9 & 56.5 & -- & 89.5 \\
+VideoLISA-3.8B & 73.8 & 63.4 & 68.3 & 68.8 & -- & -- & -- & -- & -- & 96.4 \\
+VISA-13B & 72.4 & 59.8 & 65.5 & 70.4 & 50.9 & -- & -- & -- & -- & 96.8 \\
 \midrule
-Sa2VA-1B (100\%) & 77.4 & 69.9 & 72.3 & 41.7 & 72.3 & 47.6 & 1381/405 & 68.3 & 64.8 & 39.9 & 100.0 \\
+Sa2VA-1B (100\%) & 77.4 & 69.9 & 72.3 & 72.3 & 47.6 & 1381/405 & 68.3 & 64.8 & 39.9 & 100.0 \\
 \midrule
-Sa2VA-Select-1B (40\%) & 77.5 & 69.1 & 74.8 & 52.2 & 71.0 & 51.2 & 1403/384 & 66.1 & 69.3 & 40.4 & 103.8 \\
+Sa2VA-Select-1B (40\%) & 77.5 & 69.1 & 74.8 & 71.0 & 51.2 & 1403/384 & 66.1 & 69.3 & 40.4 & 101.5 \\
 \bottomrule
 \end{tabular}%
 }
@@ -205,7 +205,7 @@ Sa2VA-1B & 77.4 & 69.9 & 72.3 & 72.3 & 50.8 & 100.0\% & 2.76 & 40.16 & 216.12 \\
 Sa2VA-Select-1B (40\%) & \shortstack{77.5\\(100.1\%)} & \shortstack{69.1\\(98.9\%)} & \shortstack{74.8\\(103.5\%)} & \shortstack{71.0\\(98.2\%)} & \shortstack{52.2\\(102.8\%)} & 100.7\% & 2.50 & 38.17 & 238.80 \\
 Sa2VA-Select-1B (30\%) & \shortstack{77.4\\(100.0\%)} & \shortstack{69.6\\(99.6\%)} & \shortstack{74.6\\(103.2\%)} & \shortstack{70.6\\(97.6\%)} & \shortstack{47.6\\(93.7\%)} & 98.8\% & 2.46 & 35.14 & 243.08 \\
 Sa2VA-Select-1B (20\%) & \shortstack{75.7\\(97.8\%)} & \shortstack{66.1\\(94.6\%)} & \shortstack{72.3\\(100.0\%)} & \shortstack{69.3\\(95.9\%)} & \shortstack{52.1\\(102.6\%)} & 98.2\% & 2.42 & 35.64 & \textbf{204.96} \\
-Sa2VA-Select-1B (10\%) & \shortstack{77.4\\(100.0\%)} & \shortstack{69.6\\(99.6\%)} & \shortstack{74.6\\(103.2\%)} & \shortstack{70.6\\(97.6\%)} & \shortstack{47.6\\(93.7\%)} & 98.8\% & \textbf{2.37} & \textbf{34.78} & 241.19 \\
+Sa2VA-Select-1B (10\%) & \shortstack{77.4\\(100.0\%)} & \shortstack{69.6\\(99.6\%)} & \shortstack{74.6\\(103.2\%)} & \shortstack{68.0\\(94.1\%)} & \shortstack{51.9\\(102.2\%)} & 98.8\% & \textbf{2.37} & \textbf{34.78} & 241.19 \\
 \bottomrule
 \end{tabular}%
 }
