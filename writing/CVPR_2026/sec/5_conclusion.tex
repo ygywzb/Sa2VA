@@ -1,10 +1,14 @@
 \section{Conclusion}
 \label{sec:conclusion}
 
-We presented Sa2VA-Select, which learns to retain visual features that best support \texttt{[SEG]} generation for dense grounded image-and-video understanding.
-By training LIS/DiffTopK/CAS on Sa2VA's unified visual stream, we reduce the visual token budget while keeping the baseline task interface and improving the quality of segmentability cues used by SAM2.
-Empirically, we observe a favorable accuracy--efficiency trade-off on Sa2VA-1B on dense grounded benchmarks and efficiency profiling, including improved overall multi-task performance at 30\% retention and reduced peak GPU memory.
+We presented Sa2VA-Select, a compatible extension of Sa2VA for studying learnable visual token selection in unified dense grounded image and video understanding.
+Unlike VQA-style compression settings, Sa2VA-Select must preserve visual evidence for both language generation and segmentation-sensitive \texttt{[SEG]} token prediction.
+By applying a learnable selector to the fused image/video+VP stream before the MLLM, and by using differentiable training-time selection with inference-time hard Top-$k$ pruning, our method provides a controllable way to trade visual token budget for efficiency.
+Across image/video segmentation, multimodal conversation, and efficiency profiling, our current results suggest that moderate token reduction can preserve the baseline's unified-task capability and improve selected dense grounding benchmarks.
 
 \paragraph{Limitations and future work.}
-Our current study is limited to Sa2VA-1B and a small set of retention ratios.
-Future work includes a controlled analysis of positional encoding choices under pruning (e.g., RoPE variants for spatiotemporal tokens), broader scaling to larger backbones, and a more comprehensive system-level profiling of latency under different decoding settings.
+This study is an initial step toward efficient unified dense grounding, and several aspects remain to be strengthened.
+First, the current evaluation focuses on Sa2VA-1B and a limited set of retention ratios; larger backbones and more diverse budgets should be evaluated in future work.
+Second, although we observe favorable trade-offs, a more detailed analysis of selected versus discarded tokens is needed to explain what visual evidence the selector preserves.
+Third, the current profiling focuses on memory, prefill time, and end-to-end latency under a fixed evaluation setting; broader system-level profiling would clarify deployment behavior under different decoding and video-length conditions.
+Finally, extending the evaluation to domain-specific high-resolution scenarios, such as remote sensing imagery, is a promising direction for validating the practical value of learnable token selection beyond existing generic benchmarks.

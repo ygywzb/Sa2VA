@@ -1,11 +1,13 @@
 \begin{abstract}
-We study visual token selection for \emph{dense grounded} image and video understanding, where models must jointly support instruction-following conversation and pixel-level outputs under long spatiotemporal contexts.
-We propose \textbf{Sa2VA-Select}, which learns to retain visual features that best support the generation of \texttt{[SEG]} tokens---intermediate segmentability cues understood by SAM2---while reducing the visual token budget.
-Our selector is instantiated with (i) a lightweight importance scorer (LIS), (ii) a train-time differentiable budgeted gate (DiffTopK) that aligns with inference-time hard Top-$k$, and (iii) a curriculum (CAS) that stabilizes multi-task optimization under progressively tighter budgets.
-For compatibility with Sa2VA, selection is applied on the unified image/video+VP stream \emph{after} fusion and \emph{before} the multimodal LLM, without changing the baseline task interface.
-At inference, we switch to standard hard Top-$k$ pruning to obtain real compute/memory savings.
+Unified multimodal models for dense grounded understanding must support both language interaction and pixel-level outputs over images and videos, which leads to large visual token budgets and high inference cost.
+While learnable visual token selection has shown promise in VQA-style multimodal large language models, it remains unclear whether such compression is still effective in unified dense grounding systems, where token reduction may directly affect segmentation-sensitive intermediate representations.
+In this work, we study this question on Sa2VA and present \textbf{Sa2VA-Select}, a compatible extension that applies learnable visual token selection to Sa2VA's unified visual stream before the multimodal LLM.
+Our design combines a lightweight importance scorer, a train-time differentiable budgeted selector, and a curriculum constraint that improves the transition from soft selection during training to hard Top-$k$ pruning at inference.
+The key goal is not merely to reduce visual tokens, but to preserve the evidence most helpful for generating accurate \texttt{[SEG]} tokens and maintaining Sa2VA's joint segmentation-and-conversation capability.
 
-On Sa2VA-1B, our model improves the overall multi-task average to 102.9\% of the baseline while retaining only the top 30\% visual tokens, with notable gains on referring video segmentation (MeViS: 41.7$\rightarrow$47.6; ReVOS: 47.6$\rightarrow$51.3).
-On the Ref-SAV benchmark, our 1B variant reaches 57.6 J\&F, exceeding both Sa2VA-8B (50.0) and zero-shot Sa2VA-8B (41.3) in our evaluation.
-We further observe reduced peak GPU memory (2.76$\rightarrow$2.46 GB) and faster prefill (40.16$\rightarrow$35.14 ms) at 30\% retention, demonstrating a favorable accuracy--efficiency trade-off for dense grounded multimodal understanding.
+Experiments on image and video dense grounding benchmarks show that learnable token selection remains effective in this more demanding setting.
+On Sa2VA-1B, Sa2VA-Select retains strong multi-task performance under substantial token reduction, and even improves several segmentation benchmarks at moderate retention ratios.
+At 30\% retention, it improves MeViS from 41.7 to 47.6 and ReVOS from 47.6 to 51.3 while reducing peak GPU memory from 2.76 to 2.46 GB and prefill time from 40.16 to 35.14 ms.
+On Ref-SAV, our 1B model reaches 57.6 J\&F, surpassing both Sa2VA-8B (50.0) and zero-shot Sa2VA-8B (41.3) under our evaluation protocol.
+These results demonstrate a favorable accuracy--efficiency trade-off for unified dense grounded image and video understanding.
 \end{abstract}

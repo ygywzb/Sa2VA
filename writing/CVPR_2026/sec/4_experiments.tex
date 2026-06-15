@@ -1,25 +1,30 @@
 \section{Experiments}
 \label{sec:exp}
 
-We evaluate Sa2VA-Select on dense grounded understanding benchmarks spanning image referring segmentation, video referring segmentation, and multimodal conversation.
-Unless otherwise specified, we compare the Sa2VA-1B baseline with Sa2VA-Select-1B under multiple visual token retention ratios.
+We evaluate Sa2VA-Select on unified dense grounded understanding benchmarks covering image referring segmentation, video referring segmentation, multimodal conversation, and efficiency profiling.
+Unless otherwise specified, all comparisons are made against the Sa2VA-1B baseline under multiple visual token retention ratios.
+Our main goal is to answer three questions: (i) whether learnable token selection remains effective in a unified segmentation-and-conversation model, (ii) how performance changes as the retained visual budget becomes tighter, and (iii) what efficiency gains are obtained at inference time.
 
 \subsection{Evaluation setup}
 \paragraph{Retention ratios.}
-We test multiple retention ratios $\rho\in\{0.4,0.3,0.2,0.1\}$, corresponding to keeping the top 40\%/30\%/20\%/10\% tokens ranked by LIS at inference.
+We test multiple retention ratios $\rho\in\{0.4,0.3,0.2,0.1\}$, corresponding to keeping the top 40\%/30\%/20\%/10\% visual tokens ranked by LIS at inference.
+This sweep lets us study not only the best operating point, but also the broader performance--efficiency trade-off under increasingly aggressive pruning.
 
 \paragraph{Tasks and metrics.}
-For image referring segmentation, we report cIoU on RefCOCO/RefCOCO+/RefCOCOg.
-For video referring segmentation, we report J\&F on MeViS and Ref-SAV; we also include Ref-DAVIS17 when available.
-For multimodal conversation, we follow standard benchmark protocols (e.g., MME/MMBench/SEED-Bench and their video counterparts).
+For image referring segmentation, we report cIoU on RefCOCO, RefCOCO+, and RefCOCOg.
+For video referring segmentation, we report J\&F on MeViS and Ref-SAV, and include Ref-DAVIS17 when available.
+For multimodal conversation, we follow standard benchmark protocols, including MME, MMBench, SEED-Bench, and their video counterparts.
+Together, these tasks cover the two capabilities that are most relevant to our setting: dense grounding quality and general multimodal reasoning.
 
 \paragraph{Training datasets and finetuning scope.}
-Table~\ref{tab:train_datasets_seg} summarizes the training datasets used for Sa2VA-Select finetuning.
+Table~\ref{tab:train_datasets_seg} summarizes the segmentation-related data used for finetuning.
 We initialize from a Sa2VA-pretrained checkpoint and finetune only (i) LoRA parameters and (ii) the learnable attention parameters in LIS (e.g., $\mathbf{W}_q,\mathbf{W}_k$ in \eqref{eq:method_lis_qk}), while keeping the remaining backbone parameters frozen.
-We focus on segmentation-related data sources and omit QA-only datasets.
+This setup is intentionally lightweight: it isolates the effect of adding token selection to Sa2VA rather than re-optimizing the full model.
 
 \paragraph{Dataset sampling and repeats.}
-We use a concatenated dataset with repeat factors for each source: RefCOCO/RefCOCO+/RefCOCOg use repeats 5/5/4, and ReVOS/MeViS/Ref-YTVOS/Ref-SAV use repeats 10/4/4/4, respectively. We group batches by modality length to reduce padding variance.
+We use a concatenated training dataset with repeat factors for each source.
+RefCOCO/RefCOCO+/RefCOCOg use repeats 5/5/4, while ReVOS/MeViS/Ref-YTVOS/Ref-SAV use repeats 10/4/4/4, respectively.
+Batches are grouped by modality length to reduce padding variance.
 
 \begin{table}[t]
 \caption{Sa2VA-Select finetuning datasets (segmentation-related).}
@@ -38,19 +43,36 @@ Video Seg & Ref-YTVOS (3.5K), MeViS (0.6K), ReVOS (1.7K), Ref-SAV (37K) \\
 \end{table}
 
 \paragraph{Implementation details.}
-Our backbone is InternVL2.5-1B initialized from the Sa2VA-1B checkpoint; the LLM and visual encoder are frozen. We train LoRA with $r=128$, $\alpha=256$, dropout $0.05$, and a lightweight TransformerScorer (in\_features=896) for LIS. The training budget is set to 0.3 (retain 30\% visual tokens); budgets are adjustable for other retention ratios at inference (e.g., 0.1/0.2/0.3/0.4).
-We train for 1 epoch with per-device batch size 2 and gradient accumulation 4 on 2$\times$A100-SXM4-40GB (about 20 hours). Optimization uses AdamW with lr $4\times10^{-5}$, betas $(0.9,0.999)$, weight decay 0.05, and gradient clipping at 1.0. We use bfloat16 AMP with dynamic loss scaling and 8 dataloader workers.
-The learning-rate schedule applies 5\% linear warmup (start factor $10^{-5}$) followed by cosine annealing to zero. The tokenizer is loaded from the backbone with the \texttt{qwen\_chat} template, max length 8192, right padding, and special tokens [SEG], \texttt{<p>}, \texttt{</p>}, \texttt{<vp>}, \texttt{</vp>}. Images are resized with a 1024 target length. Loss weights are 2.0 for the mask loss and 0.5 for the Dice loss.
-For CAS, we use the default linear schedule with $\lambda_{\mathrm{start}}=0.1$ and $\lambda_{\mathrm{end}}=3.0$ over training steps. DiffTopK uses the default settings without additional hyperparameters.
+Our backbone is InternVL2.5-1B initialized from the Sa2VA-1B checkpoint; the LLM and visual encoder are frozen.
+We train LoRA with $r=128$, $\alpha=256$, dropout $0.05$, and a lightweight TransformerScorer (in\_features=896) for LIS.
+The training budget is set to 0.3, while the retention ratio is adjusted at inference for evaluation under 0.1/0.2/0.3/0.4.
+We train for 1 epoch with per-device batch size 2 and gradient accumulation 4 on 2$\times$A100-SXM4-40GB GPUs for about 20 hours.
+Optimization uses AdamW with learning rate $4\times10^{-5}$, betas $(0.9,0.999)$, weight decay 0.05, and gradient clipping at 1.0.
+We use bfloat16 AMP with dynamic loss scaling and 8 dataloader workers.
+The learning-rate schedule applies 5\% linear warmup (start factor $10^{-5}$) followed by cosine annealing to zero.
+The tokenizer is loaded from the backbone with the \texttt{qwen\_chat} template, max length 8192, right padding, and special tokens [SEG], \texttt{<p>}, \texttt{</p>}, \texttt{<vp>}, \texttt{</vp>}.
+Images are resized with a target length of 1024.
+Loss weights are 2.0 for the mask loss and 0.5 for the Dice loss.
+For CAS, we use a linear schedule with $\lambda_{\mathrm{start}}=0.1$ and $\lambda_{\mathrm{end}}=3.0$ over training steps.
+DiffTopK uses the default settings without additional hyperparameters.
 
 \subsection{Main results across tasks}
-We follow the original Sa2VA evaluation protocol without modification and present the main results in Table~\ref{tab:overall_table6_summary} and Table~\ref{tab:image_level_bench_sa2va1b_dev}.
+We follow the original Sa2VA evaluation protocol without modification and report the main results in Table~\ref{tab:overall_table6_summary} and Table~\ref{tab:image_level_bench_sa2va1b_dev}.
+Overall, the results support a consistent conclusion: learnable token selection remains effective even when the model must jointly preserve segmentation quality and multimodal conversation ability.
 
 \paragraph{Comparison with strong baselines.}
-Table~\ref{tab:overall_table6_summary} provides a multi-task summary across image/video segmentation and chat benchmarks. With 40\% visual tokens retained (60\% reduction), Sa2VA-Select-1B shows substantial gains on video referring segmentation (MeViS: 41.7$\rightarrow$52.2; ReVOS: 47.6$\rightarrow$51.2) while maintaining comparable image referring segmentation (RefCOCOg: 72.3$\rightarrow$74.8). Chat benchmarks remain within a narrow range of the baseline, indicating that token reduction does not collapse general vision-language reasoning.
+Table~\ref{tab:overall_table6_summary} presents a summary across image segmentation, video segmentation, and chat-oriented benchmarks.
+Compared with Sa2VA-1B, Sa2VA-Select-1B at 40\% retention improves several dense grounding results, especially on video referring segmentation, where MeViS rises from 41.7 to 52.2 and ReVOS from 47.6 to 51.2.
+At the same time, image referring segmentation remains competitive, with RefCOCOg improving from 72.3 to 74.8.
+The chat benchmarks stay close to the baseline overall, suggesting that moderate visual token reduction does not collapse general multimodal reasoning even in a unified model.
+These observations are important because they indicate that compression is not merely tolerable in this setting, but can also coincide with improved dense grounding performance.
 
 \paragraph{Detailed results and retention sweep.}
-Table~\ref{tab:image_level_bench_sa2va1b_dev} details performance across image-level benchmarks with relative percentages w.r.t. Sa2VA-1B (100\%). At 30--40\% retention, most metrics stay close to the baseline (e.g., MMBench $\approx$96--98\%, SEED $\approx$105--107\%, RefCOCOg $\approx$103\%), while more aggressive pruning (10\%) shows clearer degradation on general QA benchmarks. Overall, 40\% retention provides the best multi-task balance and is selected as the main result point.
+Table~\ref{tab:image_level_bench_sa2va1b_dev} provides a more detailed retention sweep on image-level benchmarks.
+A clear pattern emerges: moderate pruning at 30--40\% retention largely preserves the baseline across most metrics, while more aggressive pruning at 10--20\% leads to more visible degradation on general QA-oriented benchmarks.
+At the same time, segmentation-related metrics are often more stable than general chat benchmarks, and RefCOCOg remains above the baseline at several retention ratios.
+This behavior is consistent with our goal of preserving evidence that is useful for dense grounding rather than optimizing for VQA-style accuracy alone.
+In the remainder of the paper, we therefore interpret 30--40\% retention as the most favorable operating region for balancing unified-task performance and token reduction.
 
 \begin{table*}[t]
 \caption{Overall benchmark results (two-column summary, adapted from Table~6).
@@ -95,7 +117,11 @@ Sa2VA-Select-1B (40\%) & 77.5 & 69.1 & 74.8 & 52.2 & 71.0 & 51.2 & 1403/384 & 66
 
 \subsection{Ref-SAV validation results}
 \label{sec:exp_refsav}
-We follow the original Sa2VA evaluation protocol without modification. Table~\ref{tab:refsav_dev} compares Sa2VA-Select-1B at different retention ratios $\rho$ with Sa2VA-8B (zs) and Sa2VA-8B reported in the Sa2VA paper. With only 20\% retention, Sa2VA-Select-1B achieves the best Overall J\&F (57.6), surpassing Sa2VA-8B (50.0) and Sa2VA-8B (zs, 41.3). Results are stable across $\rho\in\{0.1,0.2,0.3,0.4\}$, indicating robustness to aggressive token reduction; the best Overall J\&F is at $\rho=0.2$, while the best Short J\&F is at $\rho=0.3$.
+Table~\ref{tab:refsav_dev} reports Ref-SAV validation performance at different retention ratios and compares our 1B model with the Sa2VA-8B results reported in the original Sa2VA paper.
+A notable observation is that Sa2VA-Select-1B remains strong even under aggressive compression.
+At 20\% retention, it achieves the best overall J\&F of 57.6, surpassing both Sa2VA-8B (50.0) and zero-shot Sa2VA-8B (41.3) under our evaluation protocol.
+Performance is also relatively stable across $\rho\in\{0.1,0.2,0.3,0.4\}$, suggesting that the selector is not overly sensitive to the exact operating budget on this benchmark.
+This robustness is encouraging because it indicates that the learned ranking can preserve video grounding evidence even when the retained token set is small.
 
 \begin{table}[t]
 \caption{Ref-SAV validation results (J, F, and J\&F). ``zs'' denotes zero-shot; Sa2VA-8B numbers are from the Sa2VA paper.}
@@ -146,7 +172,19 @@ Sa2VA-Select-1B (10\%) & \shortstack{1345/333\\(94.0\%)} & \shortstack{63.0\\(92
 \end{table*}
 
 \subsection{Efficiency analysis}
-We evaluate efficiency on MeViS (val\_u), consistent with the baseline Sa2VA protocol, using all samples and report the dataset average on a single A100-SXM4-40GB GPU with the same input processing as Sa2VA-1B. We measure three metrics: max GPU memory, prefill time, and end-to-end (E2E) latency. Prefill time is measured from the start of \texttt{generate} to the first full-sequence forward (seq length $\neq 1$), and E2E latency measures the full \texttt{generate} call (prefill + decoding); peak memory is the maximum allocated GPU memory during generation. We do not use warmup or discard initial samples. Table~\ref{tab:efficiency_mevis} summarizes the trade-offs across retention ratios, while ``Perf.'' is the average of Image Seg and Video Seg relative to Sa2VA-1B (100\%). Lower retention consistently reduces memory and prefill time, with the smallest memory footprint at 10\% retention (2.37~GB) and the fastest prefill at 10\% (34.78~ms). The lowest E2E latency is achieved at 20\% retention (204.96~ms), slightly below the Sa2VA-1B baseline (216.12~ms), while 30--40\% retention increases E2E latency despite higher accuracy on video referring segmentation. Minor performance gains under token reduction should be interpreted cautiously, as they may arise from removing redundant visual tokens rather than systematic improvements.
+We evaluate efficiency on MeViS (val\_u), following the Sa2VA protocol and using all samples on a single A100-SXM4-40GB GPU with the same input processing as Sa2VA-1B.
+We report three metrics: maximum GPU memory, prefill time, and end-to-end (E2E) latency.
+Prefill time is measured from the start of \texttt{generate} to the first full-sequence forward (sequence length $\neq 1$), while E2E latency measures the entire \texttt{generate} call, including both prefill and decoding.
+Peak memory is the maximum allocated GPU memory during generation.
+We do not use warmup or discard initial samples.
+
+Table~\ref{tab:efficiency_mevis} summarizes the performance--efficiency trade-off across retention ratios, where ``Perf.'' denotes the average of image and video segmentation performance relative to Sa2VA-1B.
+As expected, lower retention consistently reduces peak memory and prefill time.
+The smallest memory footprint is obtained at 10\% retention (2.37~GB), and the fastest prefill is also obtained at 10\% (34.78~ms).
+The best E2E latency is achieved at 20\% retention (204.96~ms), slightly below the Sa2VA-1B baseline (216.12~ms).
+At the same time, 30--40\% retention tends to preserve stronger dense grounding performance, especially on video benchmarks, but does not always minimize total latency.
+This result highlights an important practical point: the most accurate retention ratio is not necessarily the most efficient one, so deployment should choose the operating point according to the target application.
+More broadly, the table shows that Sa2VA-Select exposes a controllable trade-off surface rather than a single fixed compression setting.
 
 \begin{table*}[t]
 \caption{Efficiency and performance trade-offs across retention ratios for Sa2VA-Select-1B.

@@ -2,10 +2,20 @@
 \label{sec:intro}
 
 Dense grounded understanding requires models to connect language with fine-grained visual outputs such as pixel-accurate masks over images and videos.
-Recent systems (e.g., Sa2VA) achieve this by coupling a multimodal large language model (MLLM) with a strong segmentation foundation model: the MLLM interprets user instructions and generates intermediate guidance that steers the segmentation model.
-While effective, this paradigm is expensive because dense grounding benefits from high-resolution visual representations and long spatiotemporal contexts, leading to large visual token budgets that inflate memory footprint and latency.
+Recent unified systems, such as Sa2VA, move toward this goal by combining a multimodal large language model (MLLM) with a segmentation foundation model, so that a single interface can support both instruction-following conversation and segmentation-oriented prediction.
+This unified design is attractive, but it is also computationally demanding: high-resolution images, long videos, and prompt-conditioned visual evidence all contribute to a large visual token budget before decoding begins.
 
-This paper asks a practical question: \emph{can we reduce the number of visual tokens entering the MLLM while preserving (or even improving) the quality of the \texttt{[SEG]} tokens that guide segmentation and the downstream conversation}? Our answer is affirmative: we learn a token selector that preserves features most helpful for generating accurate \texttt{[SEG]} tokens (segmentability cues understood by SAM2), while still supporting Sa2VA's multimodal outputs. For compatibility, selection is applied on Sa2VA's unified image/video+VP stream after fusion and before the MLLM, but the contribution is the learned retention for \texttt{[SEG]} quality rather than the fusion itself.
+Reducing this visual token burden is therefore an important practical problem.
+Prior work on visual token compression has shown encouraging results in VQA-style MLLMs, where the main objective is to preserve answer quality under fewer visual tokens.
+However, it remains unclear whether the same idea transfers to \emph{dense grounded unified models}.
+Compared with VQA, this setting is more sensitive to losing local visual evidence because the model must not only answer questions, but also generate \texttt{[SEG]} tokens that serve as segmentability cues for a downstream mask decoder.
+In addition, Sa2VA operates on a unified visual stream that contains both image/video tokens and visual-prompt-conditioned tokens, making token selection a different problem from compressing ordinary image features in question answering pipelines.
+
+This paper studies the following question: \emph{can learnable visual token selection remain effective in a unified image-video model that jointly supports segmentation and conversation?}
+We answer this question by equipping Sa2VA with a compatible token selection module and evaluating the resulting system across image referring segmentation, video referring segmentation, multimodal conversation, and efficiency profiling.
+Our method, \textbf{Sa2VA-Select}, applies token selection to Sa2VA's unified image/video+VP stream after fusion and before the MLLM.
+This insertion point is important because it is the stage where long-context visual evidence and prompt-conditioned evidence first co-exist and jointly influence the generation of \texttt{[SEG]} tokens.
+Rather than redesigning Sa2VA's task interface, we keep the original segmentation-and-conversation pipeline unchanged and focus on learning which visual features should be retained under a given token budget.
 
 \begin{figure*}[t]
 \centering
@@ -21,23 +31,26 @@ We encode image/video inputs together with visual prompts (VP) into a unified to
 \end{figure*}
 
 \paragraph{Challenges.}
-Token pruning in dense grounded settings is non-trivial for three reasons.
-First, Sa2VA is inherently multi-task: selection must support both segmentation-oriented supervision (mask quality) and conversation-oriented supervision (language modeling), which can produce competing gradients.
-Second, Sa2VA inputs contain heterogeneous visual evidence, including VP-conditioned tokens created from user prompts (points/boxes/scribbles), so selecting tokens on the \emph{fused} stream differs from VQA-only pipelines even though the main goal is to retain evidence that improves \texttt{[SEG]} generation.
-Third, discrete Top-$k$ pruning is non-differentiable; a naive training/inference mismatch may harm stability and final quality.
+Token selection in this setting is non-trivial for three reasons.
+First, Sa2VA is inherently multi-task: the retained visual evidence must support both segmentation-oriented supervision and conversation-oriented supervision, which may impose competing demands on the selector.
+Second, the visual input is heterogeneous and includes VP-conditioned tokens created from user prompts such as points, boxes, and scribbles; as a result, the selector operates on a \emph{fused} stream rather than on ordinary image tokens alone.
+Third, the desired inference operator is hard Top-$k$ pruning for real efficiency gains, but its discreteness introduces a train--test mismatch unless optimization is handled carefully.
 
 \paragraph{Our approach.}
-We identify the \emph{unified visual token stream} in Sa2VA as the right intervention point for efficiency: it is the first place where long-context image/video evidence and VP-conditioned evidence co-exist and directly drive \texttt{[SEG]} token generation.
-Sa2VA-Select places a budgeted selection module at this interface (``append-then-select'') so the selector can learn which features most improve \texttt{[SEG]} quality before pruning, while the downstream MLLM sees a shorter context.
-We train the selector with a differentiable Top-$k$ surrogate and a curriculum-weighted constraint to reduce the train--test gap between soft gating (training) and hard Top-$k$ pruning (inference), while keeping Sa2VA's multi-task decoding unchanged.
+We identify the \emph{unified visual token stream} in Sa2VA as the right intervention point for efficiency.
+At this stage, long-context image/video evidence and VP-conditioned evidence have already been assembled, but the expensive MLLM decoding has not yet begun.
+Sa2VA-Select therefore inserts a budgeted selector at this interface so that the model can learn which features are most helpful for \texttt{[SEG]} generation and downstream multimodal decoding before pruning.
+Our implementation follows the learnable selection recipe of importance scoring, differentiable budgeted gating during training, and hard Top-$k$ pruning during inference, together with a curriculum constraint that narrows the train--test gap.
+This design lets us study whether learnable token selection can be transferred effectively from VQA-style MLLMs to unified dense grounded understanding.
 
 \paragraph{Results preview.}
-On Sa2VA-1B, retaining only the top 30\% visual tokens improves the overall multi-task average to 102.9\% of the baseline, with gains on referring video segmentation (MeViS: 41.7$\rightarrow$47.6; ReVOS: 47.6$\rightarrow$51.3).
-We also observe reduced peak GPU memory (2.76$\rightarrow$2.46 GB) and faster prefill (40.16$\rightarrow$35.14 ms) at 30\% retention.
+Experiments show that learnable token selection remains effective in this more demanding setting.
+On Sa2VA-1B, retaining only the top 30\% visual tokens improves referring video segmentation on MeViS from 41.7 to 47.6 and on ReVOS from 47.6 to 51.3, while also reducing peak GPU memory from 2.76 to 2.46 GB and prefill time from 40.16 to 35.14 ms.
+Across multiple retention ratios, we observe that moderate token reduction largely preserves the baseline's joint segmentation-and-conversation capability, and in several cases improves dense grounding performance rather than merely maintaining it.
 
 \paragraph{Contributions.}
 \begin{itemize}
-    \item \textbf{Learning to preserve \texttt{[SEG]}-critical evidence.} We formulate token selection for dense grounded understanding with the explicit goal of improving \texttt{[SEG]} token quality (segmentability cues for SAM2), while keeping Sa2VA's multi-task interface unchanged.
-    \item \textbf{Train--test aligned budgeted selection under multi-task supervision.} We provide a training pipeline with differentiable budgeted gating and a curriculum constraint that improves robustness when switching to inference-time hard Top-$k$ pruning.
-    \item \textbf{Empirical and efficiency evaluation.} We evaluate across image/video referring segmentation and efficiency profiling under multiple retention ratios, and include a protocol (with placeholders where needed) to verify that pruning does not degrade general multimodal conversation ability.
+    \item \textbf{Extending learnable token selection to unified dense grounding.} We study visual token selection in a unified image-video model that jointly supports segmentation and conversation, a setting that is more demanding than prior VQA-style token compression.
+    \item \textbf{A compatible integration on Sa2VA's unified visual stream.} We place a learnable budgeted selector on the fused image/video+VP token stream before the MLLM, with the goal of preserving evidence that is most helpful for accurate \texttt{[SEG]} generation while keeping Sa2VA's original task interface unchanged.
+    \item \textbf{Accuracy--efficiency validation across tasks.} We show across image/video referring segmentation, multimodal conversation, and efficiency profiling that moderate token reduction yields favorable trade-offs and can even improve dense grounding performance on several benchmarks.
 \end{itemize}

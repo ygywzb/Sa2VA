@@ -1,149 +1,163 @@
 \section{Method}
 \label{sec:method}
 
-We present Sa2VA-Select, which equips Sa2VA with a learnable visual token selector to retain features that best support \texttt{[SEG]} generation---the intermediate \emph{segmentability cues} consumed by SAM2.
-The selector is trained with LIS/DiffTopK/CAS and applied to the unified visual stream produced by Sa2VA's multimodal fusion, without altering the baseline task interface.
-
+We present Sa2VA-Select, a compatible extension of Sa2VA that applies learnable visual token selection to the unified visual stream before the multimodal LLM.
+Our goal is not to redesign Sa2VA's task interface, but to reduce the visual token budget while preserving the evidence most useful for generating accurate \texttt{[SEG]} tokens and maintaining the model's joint segmentation-and-conversation capability.
+To this end, we instantiate the selector with three components adopted in a Sa2VA-compatible manner: a learnable importance scorer (LIS), a train-time differentiable Top-$k$ relaxation (DiffTopK), and a curriculum annealing strategy (CAS) that narrows the gap between soft training-time selection and hard inference-time pruning.
 
 \subsection{Overview}
 \label{sec:method_overview}
-Sa2VA-Select targets \emph{dense grounded multi-tasking}, where the same model must support pixel-level mask prediction and language generation. Sa2VA fuses text tokens with image/video features and visual prompts (points/boxes/scribbles), and the LLM emits \texttt{[SEG]} tokens that act as segmentability cues for SAM2 (distinct from the input VPs). Our selector operates on the fused visual stream to preserve features that are most helpful for \texttt{[SEG]} generation, while reducing the token budget consumed by the LLM.
+Sa2VA-Select targets \emph{unified dense grounded understanding}, where the same model must support both pixel-level prediction and language generation over images and videos.
+In Sa2VA, visual inputs and visual prompts are converted into a unified visual stream that is consumed by the MLLM, and the MLLM produces \texttt{[SEG]} tokens that act as segmentability cues for SAM2.
+This makes the pre-LLM visual stream a natural intervention point: it already contains the fused evidence needed by downstream decoding, yet it is also the source of a substantial compute and memory burden.
 
 Following the baseline abstraction, for an instance $i$ with input text tokens $T_i$, image/video input (denoted as $I_i$ or $V_i$), and additional visual prompt tokens $VP_i$, the model outputs answer tokens $T_o$ and optionally masks (or masklets) $M_o$:
 \begin{equation}
-	T_o,\ M_o = \mathrm{LLM}(\{I_i, V_i, VP_i\},\ T_i).
-	\label{eq:sa2va_unified_task}
+T_o,\ M_o = \mathrm{LLM}(\{I_i, V_i, VP_i\},\ T_i).
+\label{eq:sa2va_unified_task}
 \end{equation}
 Here $V_i$ denotes the raw video input, while bold symbols (e.g., $\mathbf{V}$) denote token features.
 For chat-only tasks, $M_o$ is absent; for referring segmentation tasks, $M_o$ is an image mask or a spatio-temporal masklet.
 
-We instantiate the bottleneck with a lightweight importance scorer and a train-time differentiable Top-$k$ surrogate (used only for optimization), and switch to standard hard Top-$k$ pruning at inference for real compute/memory savings.
-A curriculum-weighted constraint is used to reduce the mismatch between soft gating during training and discrete pruning at inference under Sa2VA's multi-task supervision.
-
-Figure~\ref{fig:framework} provides an overview of the end-to-end pipeline and the insertion point of the selection bottleneck.
+Our design inserts a budgeted selector between Sa2VA's fused visual representation and the MLLM.
+During training, the selector uses a differentiable relaxation so that downstream supervision can update token importance scores end-to-end.
+During inference, it switches to standard hard Top-$k$ pruning so that the reduced token count corresponds to actual efficiency gains.
+Figure~\ref{fig:framework} summarizes this insertion point and the overall pipeline.
 
 \paragraph{Notation.}
 Let $\mathbf{V}\in\mathbb{R}^{N\times D}$ denote the unified visual token features required by the LLM, where $N$ is the number of tokens and $D$ is the feature dimension.
-We use a retention ratio $\rho\in(0,1]$ and set the token budget as
+Given a retention ratio $\rho\in(0,1]$, we define the retained token budget as
 \begin{equation}
-	k = \lfloor \rho N \rfloor.
-	\label{eq:method_token_budget}
+k = \lfloor \rho N \rfloor.
+\label{eq:method_token_budget}
 \end{equation}
+Our objective is to keep only $k$ visual tokens while preserving the features most helpful for downstream dense grounding and conversation.
 
 \paragraph{Unified visual feature stream (Sa2VA baseline).}
 Sa2VA converts visual prompts into a binary mask $\mathbf{M}\in\{0,1\}^{H\times W}$ and forms VP-conditioned tokens by masking a downsampled thumbnail:
 \begin{equation}
 \begin{aligned}
-	\bar{\mathcal{I}} &= \mathrm{Down}(\mathcal{I}) \in \mathbb{R}^{\bar{H}\times\bar{W}\times 3},\\
-	\bar{\mathbf{M}} &= \mathrm{Down}(\mathbf{M}) \in \{0,1\}^{\bar{H}\times\bar{W}},\\
-	\mathcal{I}^{\mathrm{vp}} &= \bar{\mathcal{I}} \odot \bar{\mathbf{M}},
+\bar{\mathcal{I}} &= \mathrm{Down}(\mathcal{I}) \in \mathbb{R}^{\bar{H}\times\bar{W}\times 3},\\
+\bar{\mathbf{M}} &= \mathrm{Down}(\mathbf{M}) \in \{0,1\}^{\bar{H}\times\bar{W}},\\
+\mathcal{I}^{\mathrm{vp}} &= \bar{\mathcal{I}} \odot \bar{\mathbf{M}},
 \end{aligned}
 \label{eq:method_vp_masked_thumb}
 \end{equation}
 where $\odot$ denotes broadcasting element-wise multiplication.
 
-We then encode the masked thumbnail and append it to the original Sa2VA visual tokens:
+The masked thumbnail is then encoded and appended to the original Sa2VA visual tokens:
 \begin{equation}
 \begin{aligned}
-	\mathbf{X}^{\mathrm{vis}} &= \mathrm{Enc}(\mathcal{I}\ \text{or}\ \mathcal{V}) \in \mathbb{R}^{T_{\mathrm{vis}}\times d},\\
-	\mathbf{X}^{\mathrm{vp}} &= \mathrm{Enc}_{\mathrm{vp}}(\mathcal{I}^{\mathrm{vp}}) \in \mathbb{R}^{T_{\mathrm{vp}}\times d},\\
-	\mathbf{X} &= [\mathbf{X}^{\mathrm{vis}};\ \mathbf{X}^{\mathrm{vp}}] \in \mathbb{R}^{(T_{\mathrm{vis}}+T_{\mathrm{vp}})\times d}.
+\mathbf{X}^{\mathrm{vis}} &= \mathrm{Enc}(\mathcal{I}\ \text{or}\ \mathcal{V}) \in \mathbb{R}^{T_{\mathrm{vis}}\times d},\\
+\mathbf{X}^{\mathrm{vp}} &= \mathrm{Enc}_{\mathrm{vp}}(\mathcal{I}^{\mathrm{vp}}) \in \mathbb{R}^{T_{\mathrm{vp}}\times d},\\
+\mathbf{X} &= [\mathbf{X}^{\mathrm{vis}};\ \mathbf{X}^{\mathrm{vp}}] \in \mathbb{R}^{(T_{\mathrm{vis}}+T_{\mathrm{vp}})\times d}.
 \end{aligned}
 \label{eq:method_unified_tokens}
 \end{equation}
-Here $\mathbf{X}^{\mathrm{vis}}$ includes full image/video tokens and thumbnail tokens, while $\mathbf{X}^{\mathrm{vp}}$ encodes the VP-masked thumbnail; we apply positional encoding after concatenating the full stream.
-For clarity, we denote this fused token stream as $\mathbf{V}$ when describing the token selection modules.
+Here $\mathbf{X}^{\mathrm{vis}}$ includes full image/video tokens and thumbnail tokens, while $\mathbf{X}^{\mathrm{vp}}$ encodes the VP-masked thumbnail.
+For clarity, we denote this fused stream as $\mathbf{V}$ when describing token selection.
+Applying selection at this stage allows the selector to jointly rank ordinary visual evidence and VP-conditioned evidence under a shared budget.
 
 \subsection{Learnable importance scoring (LIS)}
 \label{sec:method_lis}
-Given the fused visual tokens $\mathbf{V}\in\mathbb{R}^{N\times D}$, LIS predicts an importance score $s_i$ for each token $i$, aiming to retain features that better support \texttt{[SEG]} generation and SAM2 segmentability cues.
-Following the simplified self-attention scoring form in VisionSelector, we compute
+Given the fused visual tokens $\mathbf{V}\in\mathbb{R}^{N\times D}$, LIS predicts an importance score $s_i$ for each token $i$.
+In our setting, these scores should reflect how useful each token is for preserving dense grounding quality, especially the generation of reliable \texttt{[SEG]} cues, while still supporting the model's language output.
+Following the simplified self-attention-style scorer used in VisionSelector, we compute
 \begin{equation}
-	\mathbf{Q}=\mathbf{V}\mathbf{W}_{q},\quad \mathbf{K}=\mathbf{V}\mathbf{W}_{k},
-	\label{eq:method_lis_qk}
+\mathbf{Q}=\mathbf{V}\mathbf{W}_{q},\quad \mathbf{K}=\mathbf{V}\mathbf{W}_{k},
+\label{eq:method_lis_qk}
 \end{equation}
 where $\mathbf{W}_{q},\mathbf{W}_{k}\in\mathbb{R}^{D\times d}$ are learnable projections and $d$ is the hidden dimension.
-We then form a self-attention score matrix and obtain per-token importance by averaging interactions:
+We then form a score matrix and average interactions to obtain per-token importance:
 \begin{equation}
-	\mathbf{A}=\frac{\mathbf{Q}\mathbf{K}^{\top}}{\sqrt{d}},\quad s_i=\frac{1}{N}\sum_{j=1}^{N}A_{ij}.
-	\label{eq:method_lis_score}
+\mathbf{A}=\frac{\mathbf{Q}\mathbf{K}^{\top}}{\sqrt{d}},\quad s_i=\frac{1}{N}\sum_{j=1}^{N}A_{ij}.
+\label{eq:method_lis_score}
 \end{equation}
-This scoring encourages tokens that interact strongly with many others (i.e., capturing global context) to receive higher importance.
+This scorer is lightweight, easy to insert into Sa2VA, and provides a token ranking that can be optimized under downstream supervision.
 
 \subsection{Train-time differentiable selection via DiffTopK}
 \label{sec:method_difftopk}
-The standard Top-$k$ operator is discrete and non-differentiable.
-During training, we adopt a continuous relaxation to obtain a soft selection mask $\mathbf{M}_{\mathrm{soft}}\in(0,1)^{N}$:
+The target inference operator is hard Top-$k$ pruning, but a discrete Top-$k$ cannot be optimized directly with standard backpropagation.
+We therefore use a differentiable relaxation during training and reserve hard pruning for inference.
+Specifically, DiffTopK produces a soft selection mask $\mathbf{M}_{\mathrm{soft}}\in(0,1)^N$:
 \begin{equation}
-	\mathbf{M}_{\mathrm{soft}} = \mathrm{DiffTopK}(\mathbf{s}) = \sigma(\mathbf{s}+t),\quad \sum_{i=1}^{N} M_i \approx k,
-	\label{eq:method_difftopk_forward}
+\mathbf{M}_{\mathrm{soft}} = \mathrm{DiffTopK}(\mathbf{s}) = \sigma(\mathbf{s}+t),\quad \sum_{i=1}^{N} M_i \approx k,
+\label{eq:method_difftopk_forward}
 \end{equation}
 where $\sigma(\cdot)$ is the sigmoid function and $t$ is a scalar threshold solved by bisection in the forward pass to satisfy the budget.
-The soft mask can be interpreted as per-token selection probabilities and inherits the monotonicity of the sigmoid, i.e.,
+The resulting mask preserves the ranking induced by the scores:
 \begin{equation}
-	[\mathrm{DiffTopK}(\mathbf{s})]_i > [\mathrm{DiffTopK}(\mathbf{s})]_j \Leftrightarrow s_i > s_j.
-	\label{eq:method_difftopk_mono}
+[\mathrm{DiffTopK}(\mathbf{s})]_i > [\mathrm{DiffTopK}(\mathbf{s})]_j \Leftrightarrow s_i > s_j.
+\label{eq:method_difftopk_mono}
 \end{equation}
-We apply the soft mask by element-wise multiplication to softly scale token magnitudes while keeping gradients:
+We apply the mask by scaling token magnitudes,
 \begin{equation}
-	\mathbf{V}_{\mathrm{pruned}} = \mathbf{M}_{\mathrm{soft}} \odot \mathbf{V}.
-	\label{eq:method_pruned_tokens}
+\mathbf{V}_{\mathrm{pruned}} = \mathbf{M}_{\mathrm{soft}} \odot \mathbf{V},
+\label{eq:method_pruned_tokens}
 \end{equation}
-This enables end-to-end gradient flow from downstream tasks to the LIS module without backpropagating through the bisection search.
+which preserves gradient flow from downstream objectives to the scorer.
+In practice, this relaxation lets the model learn token importance from the same multi-task supervision that drives Sa2VA itself.
 
 \paragraph{Backward pass via implicit differentiation.}
 We differentiate $\mathbf{M}=\sigma(\mathbf{s}+t)$ under the implicit constraint $\sum_{i=1}^{N}\sigma(s_i+t)=k$.
 Let $\mathbf{v}=\sigma'(\mathbf{s}+t)$ with $v_i=M_i(1-M_i)$.
 From the constraint, we obtain
 \begin{equation}
-	\frac{\partial t}{\partial s_j}=-\frac{v_j}{\sum_i v_i}.
-	\label{eq:method_implicit_dt}
+\frac{\partial t}{\partial s_j}=-\frac{v_j}{\sum_i v_i}.
+\label{eq:method_implicit_dt}
 \end{equation}
 The Jacobian of $\mathbf{M}$ with respect to $\mathbf{s}$ can be written as
 \begin{equation}
-	\frac{\partial \mathbf{M}}{\partial \mathbf{s}}=\mathrm{diag}(\mathbf{v})-\frac{\mathbf{v}\mathbf{v}^{\top}}{\sum_i v_i}.
-	\label{eq:method_implicit_jac}
+\frac{\partial \mathbf{M}}{\partial \mathbf{s}}=\mathrm{diag}(\mathbf{v})-\frac{\mathbf{v}\mathbf{v}^{\top}}{\sum_i v_i}.
+\label{eq:method_implicit_jac}
 \end{equation}
 Therefore, for an upstream gradient $\mathbf{g}=\frac{\partial \mathcal{L}}{\partial \mathbf{M}}$, the gradient with respect to scores is
 \begin{equation}
-	\frac{\partial \mathcal{L}}{\partial \mathbf{s}} = \mathbf{v}\odot\mathbf{g} - \frac{\mathbf{v}^{\top}\mathbf{g}}{\sum_i v_i}\,\mathbf{v}.
-	\label{eq:method_implicit_grad}
+\frac{\partial \mathcal{L}}{\partial \mathbf{s}} = \mathbf{v}\odot\mathbf{g} - \frac{\mathbf{v}^{\top}\mathbf{g}}{\sum_i v_i}\,\mathbf{v}.
+\label{eq:method_implicit_grad}
 \end{equation}
+We include this derivation for completeness because it clarifies how the budgeted soft mask remains trainable despite the implicit threshold.
 
 \subsection{Inference-time hard Top-$k$ pruning}
 \label{sec:method_topk_infer}
-At inference, we apply the standard hard Top-$k$ to obtain a binary mask $\mathbf{M}_{\mathrm{hard}}$:
+At inference, we replace the soft relaxation with standard hard Top-$k$ selection to obtain a binary mask $\mathbf{M}_{\mathrm{hard}}$:
 \begin{equation}
-    \mathbf{M}_{\mathrm{hard}}=\mathrm{TopK}(\mathbf{s}),
-    \label{eq:method_hard_topk}
+\mathbf{M}_{\mathrm{hard}}=\mathrm{TopK}(\mathbf{s}),
+\label{eq:method_hard_topk}
 \end{equation}
-and prune tokens accordingly (i.e., selecting indices with ones in $\mathbf{M}_{\mathrm{hard}}$ and re-packing a shorter sequence).
-We evaluate multiple retention ratios (e.g., top 30\%/20\%/10\%) to quantify the trade-off between token budget and task performance, while keeping the Sa2VA baseline interface in \eqref{eq:sa2va_unified_task} unchanged.
+and physically remove low-score tokens before they enter the MLLM.
+This step is what yields actual memory and latency reductions at test time.
+We evaluate multiple retention ratios (e.g., 40\%/30\%/20\%/10\%) to quantify how token budget affects both task performance and efficiency, while keeping Sa2VA's downstream interface in \eqref{eq:sa2va_unified_task} unchanged.
 
 \subsection{Curriculum annealing strategy (CAS) for multi-task training}
 \label{sec:method_cas}
-To bridge the discrepancy between soft selection during training and hard selection during inference, we adopt a composite objective with curriculum-based weighting.
-We write the total loss as
+A remaining challenge is the mismatch between soft selection during training and hard pruning during inference.
+To reduce this gap, we adopt a curriculum-weighted objective that gradually encourages the learned soft mask to behave more like the corresponding hard mask.
+The total loss is written as
 \begin{equation}
-	\mathcal{L}_{\mathrm{total}} = \mathcal{L}_{\mathrm{task}} + \lambda_t\,\mathcal{L}_{\mathrm{constraint}},
-	\label{eq:method_total_loss}
+\mathcal{L}_{\mathrm{total}} = \mathcal{L}_{\mathrm{task}} + \lambda_t\,\mathcal{L}_{\mathrm{constraint}},
+\label{eq:method_total_loss}
 \end{equation}
-where $\mathcal{L}_{\mathrm{task}}$ aggregates downstream losses (segmentation, and conversation if enabled), and $\mathcal{L}_{\mathrm{constraint}}$ regularizes the selection process.
+where $\mathcal{L}_{\mathrm{task}}$ aggregates the downstream supervision used by Sa2VA and $\mathcal{L}_{\mathrm{constraint}}$ regularizes the selection process.
 
-We encourage the soft mask $\mathbf{M}_{\mathrm{soft}}$ to approximate the ideal hard mask $\mathbf{M}_{\mathrm{hard}}$ via binary cross-entropy:
+We define the constraint by encouraging the soft mask $\mathbf{M}_{\mathrm{soft}}$ to approximate the hard Top-$k$ mask $\mathbf{M}_{\mathrm{hard}}$ through binary cross-entropy:
 \begin{equation}
-	\mathbf{M}_{\mathrm{hard}} = \mathrm{TopK}(\mathbf{s}),\qquad
-	\mathcal{L}_{\mathrm{constraint}} = \mathrm{BCE}(\mathbf{M}_{\mathrm{soft}},\mathbf{M}_{\mathrm{hard}}).
-	\label{eq:method_constraint_bce}
+\mathbf{M}_{\mathrm{hard}} = \mathrm{TopK}(\mathbf{s}),\qquad
+\mathcal{L}_{\mathrm{constraint}} = \mathrm{BCE}(\mathbf{M}_{\mathrm{soft}},\mathbf{M}_{\mathrm{hard}}).
+\label{eq:method_constraint_bce}
 \end{equation}
-This term pushes $\mathbf{M}_{\mathrm{soft}}$ toward polarized values (near 0 or 1), making the learned score distribution more directly applicable for hard Top-$k$ pruning.
+This encourages the soft mask to become more polarized over training, so that the eventual switch to hard pruning causes less mismatch.
 
-The weighting coefficient $\lambda_t$ follows a curriculum annealing schedule for the LIS-induced selection loss. Early in training, we set $\lambda_t$ small to prioritize $\mathcal{L}_{\mathrm{task}}$; it then increases linearly to a predefined maximum:
+The weighting coefficient $\lambda_t$ follows a curriculum annealing schedule.
+Early in training, we keep $\lambda_t$ small so that optimization is dominated by downstream task learning; later, we gradually increase its value so that the model is increasingly optimized under a sharper selection constraint:
 \begin{equation}
-	\lambda_t = \lambda_{\mathrm{start}} + (\lambda_{\mathrm{end}}-\lambda_{\mathrm{start}})\times \min\Big(\frac{t_{\mathrm{current}}}{t_{\mathrm{total}}},1.0\Big).
-	\label{eq:method_cas_schedule}
+\lambda_t = \lambda_{\mathrm{start}} + (\lambda_{\mathrm{end}}-\lambda_{\mathrm{start}})\times \min\Big(\frac{t_{\mathrm{current}}}{t_{\mathrm{total}}},1.0\Big).
+\label{eq:method_cas_schedule}
 \end{equation}
+This schedule is especially useful in our setting because segmentation quality and language quality may respond differently to aggressive token reduction.
 
 \subsection{Positional encoding (implementation detail)}
 \label{sec:method_rope}
-We keep the base MLLM's RoPE. During inference, hard Top-$k$ physically removes low-score visual tokens and the remaining tokens are re-packed into a shorter sequence; positional indices are therefore generated on the compressed sequence by the base model (we do not pass custom position IDs). This choice is orthogonal to LIS/DiffTopK/CAS and is reported only as an implementation detail.
+We keep the base MLLM's RoPE unchanged.
+During inference, hard Top-$k$ pruning removes low-score visual tokens and the remaining tokens are re-packed into a shorter sequence; positional indices are therefore generated on the compressed sequence by the base model, and we do not provide custom position IDs.
+This choice is orthogonal to the selector itself and is reported only as an implementation detail.
