@@ -25,8 +25,11 @@ Rather than redesigning Sa2VA's task interface, we keep the original segmentatio
 \includegraphics[width=\textwidth]{figure/创新图_总.pdf}%
 }
 \caption{Overall framework of Sa2VA-Select.
-We encode image/video inputs together with visual prompts (VP) into a unified token stream, apply a budgeted selection module before the multimodal LLM (train-time differentiable gating and inference-time hard Top-$k$ pruning), and keep Sa2VA's original task interface where \texttt{[SEG]} tokens act as segmentability cues for SAM2.
-}
+	Sa2VA first converts image/video inputs and visual prompts into unified visual tokens.
+	We insert a token selection module before the MLLM and apply a Unified Visual Token-oriented Learnable Importance Scorer (UVT-LIS) on the unified visual stream.
+	During training, a soft selection branch is optimized with a differentiable Top-$k$ mechanism, while a hard selection branch provides a binary target for the constraint loss, yielding $\mathcal{L}_{\mathrm{constraint}}=\mathrm{BCE}(\mathbf{M}_{\mathrm{soft}}, \mathbf{M}_{\mathrm{hard}})$.
+	The retained visual tokens are then concatenated with text tokens for multimodal decoding, supporting both QA and segmentation supervision.
+	During inference, we replace soft selection with hard selection to prune low-score visual tokens before the LLM, while keeping Sa2VA's original downstream decoding interface unchanged.}
 \label{fig:framework}
 \end{figure*}
 
