@@ -1,0 +1,18 @@
+# Lightweight local environment for Sa2VA on a non-training / non-inference PC.
+# Intentionally excludes GPU- and model-runtime-heavy dependencies such as:
+# torch, flash-attn, timm, xtuner[deepspeed], decord2, qwen_vl_utils,
+# transformers, and peft.
+
+google-genai>=1.49.0
+hydra-core>=1.3.2
+openai>=1.97.1
+pycocotools>=2.0.10
+pycocoevalcap
+scikit-learn
+tfd-utils>=0.2.4
+validators
+xlsxwriter
+tabulate
+sty
+portalocker
+moviepy==1.0.3
