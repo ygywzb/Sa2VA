@@ -1,9 +1,9 @@
 \section{Method}
 \label{sec:method}
 
-We present Sa2VA-Select, a compatible extension of Sa2VA that applies learnable visual token selection to the unified visual stream before the multimodal LLM.
+We present Sa2VA-Select, a compatible extension of Sa2VA that transfers learnable visual token selection to the unified visual stream before the multimodal LLM.
 Our goal is not to redesign Sa2VA's task interface, but to reduce the visual token budget while preserving the evidence most useful for generating accurate \texttt{[SEG]} tokens and maintaining the model's joint segmentation-and-conversation capability.
-To this end, we instantiate the selector with three components adopted in a Sa2VA-compatible manner: a Unified Visual Token-oriented Learnable Importance Scorer (UVT-LIS), a train-time differentiable Top-$k$ relaxation (DiffTopK), and a curriculum annealing strategy (CAS) that narrows the gap between soft training-time selection and hard inference-time pruning.
+To this end, we instantiate the selector with three components adopted in a Sa2VA-compatible manner: a Unified Visual Token-oriented Learnable Importance Scorer (UVT-LIS), a train-time differentiable Top-$k$ relaxation (DiffTopK), and a curriculum annealing strategy (CAS) that narrows the gap between train-time soft selection and inference-time hard pruning.
 
 \subsection{Overview}
 \label{sec:method_overview}
@@ -20,8 +20,8 @@ Here $V_i$ denotes the raw video input, while bold symbols (e.g., $\mathbf{V}$) 
 For chat-only tasks, $M_o$ is absent; for referring segmentation tasks, $M_o$ is an image mask or a spatio-temporal masklet.
 
 Our design inserts a budgeted selector between Sa2VA's fused visual representation and the MLLM.
-During training, the selector uses a differentiable relaxation so that downstream supervision can update token importance scores end-to-end.
-During inference, it switches to standard hard Top-$k$ pruning so that the reduced token count corresponds to actual efficiency gains.
+During training, the selector uses train-time soft selection so that downstream supervision can update token importance scores end-to-end.
+During inference, it switches to hard Top-$k$ pruning so that the reduced token count corresponds to actual efficiency gains.
 Figure~\ref{fig:framework} summarizes the full training and inference pipeline. In particular, the figure highlights that the selector operates on Sa2VA's unified visual tokens, uses soft selection together with a hard-mask target during training, and switches to hard selection at inference for actual token pruning.
 
 \paragraph{Notation.}
@@ -96,7 +96,7 @@ We apply the mask by scaling token magnitudes,
 \label{eq:method_pruned_tokens}
 \end{equation}
 which preserves gradient flow from downstream objectives to UVT-LIS.
-In practice, this relaxation lets the model learn token importance from the same multi-task supervision that drives Sa2VA itself.
+In practice, this train-time soft selection lets the model learn token importance from the same multi-task supervision that drives Sa2VA itself.
 
 \paragraph{Backward pass via implicit differentiation.}
 We differentiate $\mathbf{M}=\sigma(\mathbf{s}+t)$ under the implicit constraint $\sum_{i=1}^{N}\sigma(s_i+t)=k$.
@@ -131,7 +131,7 @@ We evaluate multiple retention ratios (e.g., 40\%/30\%/20\%/10\%) to quantify ho
 
 \subsection{Curriculum annealing strategy (CAS) for multi-task training}
 \label{sec:method_cas}
-A remaining challenge is the mismatch between soft selection during training and hard pruning during inference.
+A remaining challenge is the mismatch between train-time soft selection and inference-time hard pruning.
 To reduce this gap, we adopt a curriculum-weighted objective that gradually encourages the learned soft mask to behave more like the corresponding hard mask.
 The total loss is written as
 \begin{equation}

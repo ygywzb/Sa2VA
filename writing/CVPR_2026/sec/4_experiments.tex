@@ -12,7 +12,7 @@ This sweep lets us study not only the best operating point, but also the broader
 
 \paragraph{Tasks and metrics.}
 For image referring segmentation, we report cIoU on RefCOCO, RefCOCO+, and RefCOCOg.
-For video referring segmentation, we report J\&F on Ref-DAVIS17, ReVOS, and Ref-YTVOS in the current manuscript, while MeViS (val\_u) is used in the efficiency analysis.
+For video referring segmentation, we report J\&F on MeViS, Ref-DAVIS17, ReVOS, and Ref-YTVOS in the current manuscript, while MeViS (val\_u) is also used in the efficiency analysis.
 For multimodal conversation, we follow standard benchmark protocols, including MME, MMBench, SEED-Bench, AI2D, MMStar, MMMU, SQA$^{\mathrm{test}}$, and their video counterparts.
 For benchmarks not reported in the original Sa2VA paper, including AI2D, MMStar, MMMU, and SQA$^{\mathrm{test}}$, we evaluate the Sa2VA-1B baseline under the same local setup used for Sa2VA-Select.
 Together, these tasks cover the two capabilities that are most relevant to our setting: dense grounding quality and general multimodal reasoning.
@@ -28,12 +28,12 @@ RefCOCO/RefCOCO+/RefCOCOg use repeats 5/5/4, while ReVOS/MeViS/Ref-YTVOS/Ref-SAV
 Batches are grouped by modality length to reduce padding variance.
 
 \begin{table}[t]
-\caption{Sa2VA-Select finetuning datasets (segmentation-related).}
+\caption{Segmentation-related finetuning datasets used for Sa2VA-Select.}
 \label{tab:train_datasets_seg}
 \centering
 \small
 \setlength{\tabcolsep}{3pt}
-\begin{tabular}{l p{0.78\linewidth}}
+\begin{tabular}{l p{0.76\linewidth}}
 \toprule
 Type & Datasets (size) \\
 \midrule
@@ -59,57 +59,60 @@ DiffTopK uses the default settings without additional hyperparameters.
 
 \subsection{Main results across tasks}
 We follow the original Sa2VA evaluation protocol without modification and report the main results in Table~\ref{tab:overall_table6_summary} and Table~\ref{tab:image_level_bench_sa2va1b_dev}.
-Overall, the results support a consistent conclusion: learnable token selection remains effective even when the model must jointly preserve segmentation quality and multimodal conversation ability.
+Overall, the results support a consistent conclusion: learnable token selection remains effective after being transferred to a unified model that must jointly preserve segmentation quality and multimodal conversation ability.
 
 \paragraph{Comparison with strong baselines.}
 Table~\ref{tab:overall_table6_summary} presents a summary across image segmentation, video segmentation, and chat-oriented benchmarks.
-Compared with Sa2VA-1B, Sa2VA-Select-1B at 40\% retention improves image referring segmentation on RefCOCOg from 72.3 to 74.8, video referring segmentation on ReVOS from 47.6 to 51.2, and Ref-YTVOS from 65.3 to 66.2, while remaining competitive on Ref-DAVIS17 (72.3 to 71.0).
-The chat benchmarks stay close to the baseline overall, suggesting that moderate visual token reduction does not collapse general multimodal reasoning even in a unified model.
-These observations indicate that token reduction can preserve broad multi-task ability while still improving selected dense grounding benchmarks.
+Compared with Sa2VA-1B, Sa2VA-Select-1B at 40\% retention improves image referring segmentation on RefCOCOg from 72.3 to 74.8, video referring segmentation on MeViS from 41.7 to 44.9, ReVOS from 47.6 to 51.2, and Ref-YTVOS from 65.3 to 66.2, while remaining competitive on Ref-DAVIS17 (72.3 to 71.0).
+The 30\% model shows a similarly favorable operating point, reaching the best Ref-YTVOS and Video-MME scores in the current summary table while maintaining the same 102\% relative average as the 40\% model.
+Across these settings, the chat benchmarks remain close to the baseline overall, indicating that moderate visual token reduction does not collapse general multimodal reasoning even in a unified model.
+Taken together, Table~\ref{tab:overall_table6_summary} supports the main claim of this paper: when learnable token selection is integrated compatibly into Sa2VA's unified visual stream, it can preserve broad multi-task ability while improving several dense grounding benchmarks.
 
 \paragraph{Detailed results and retention sweep.}
 Table~\ref{tab:image_level_bench_sa2va1b_dev} provides a more detailed retention sweep on image-level benchmarks.
-A clear pattern emerges: moderate pruning at 30--40\% retention largely preserves the baseline across most metrics, while more aggressive pruning at 10--20\% leads to more visible degradation on general QA-oriented benchmarks.
-At the same time, segmentation-related metrics are often more stable than general chat benchmarks, and RefCOCOg remains above the baseline at several retention ratios.
-This behavior is consistent with our goal of preserving evidence that is useful for dense grounding rather than optimizing for VQA-style accuracy alone.
-In the remainder of the paper, we therefore interpret 30--40\% retention as the most favorable operating region for balancing unified-task performance and token reduction.
+A clear pattern emerges: moderate pruning at 30--40\% retention largely preserves the baseline across most metrics, whereas more aggressive pruning at 10--20\% causes more visible degradation on general QA-oriented benchmarks.
+At the same time, segmentation-related metrics are often more stable than general chat benchmarks, and RefCOCOg stays at or above the baseline across several retention ratios.
+This behavior is consistent with our objective: the selector is trained to preserve evidence that is most useful for unified dense grounding, rather than to optimize purely for VQA-style accuracy.
+Accordingly, we treat the 30--40\% range as the most favorable operating region for balancing unified-task performance and token reduction in the remainder of the paper.
 
 \begin{table*}[t]
-\caption{Overall benchmark results (two-column summary, adapted from Table~6).
-We report cIoU for image referring segmentation, J\&F for video referring segmentation, and standard scores for multimodal chat benchmarks.
-For MME, we report perception/cognition as A/B or the total score C(+).
-``Avg'' is the mean of per-benchmark ratios relative to Sa2VA-1B (100\%), computed over available entries for each method (missing entries are excluded; for MME(A/B) we use A$+$B).
-We temporarily exclude the main MeViS column here because our current development results are on MeViS (val\_u) rather than the standard MeViS evaluation split. The ``Avg'' for Sa2VA-1B and Sa2VA-Select-1B is therefore computed over the currently reported columns in this table.}
+\caption{Overall benchmark results across image segmentation, video segmentation, image chat, and video chat benchmarks, adapted from the original Sa2VA summary table.
+We report cIoU for image referring segmentation, J\&F for video referring segmentation, and standard benchmark scores for multimodal chat evaluation.
+For MME, we report perception/cognition as A/B, and use A$+$B when computing relative averages.
+``Avg'' denotes the mean relative performance ratio with respect to Sa2VA-1B (100\%), computed over the reported entries of each method.}
 \label{tab:overall_table6_summary}
 \centering
 \scriptsize
 \setlength{\tabcolsep}{2.2pt}
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{lccccccccccc}
+\begin{tabular}{lcccccccccccc}
 \toprule
-\multirow{2}{*}{Method} & \multicolumn{3}{c}{Image Seg (cIoU)} & \multicolumn{3}{c}{Video Seg (J\&F)} & \multicolumn{3}{c}{Image Chat} & \multicolumn{1}{c}{Video Chat} & \multirow{2}{*}{Avg} \\
-\cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10} \cmidrule(lr){11-11}
-& RefCOCO & RefCOCO+ & RefCOCOg & Ref-DAVIS17 & ReVOS & Ref-YTVOS & MME (A/B,+) & MMBench & SEED & Video-MME & \\
+\multirow{2}{*}{Method} & \multicolumn{3}{c}{Image Seg (cIoU)} & \multicolumn{4}{c}{Video Seg (J\&F)} & \multicolumn{3}{c}{Image Chat} & \multicolumn{1}{c}{Video Chat} & \multirow{2}{*}{Avg} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-8} \cmidrule(lr){9-11} \cmidrule(lr){12-12}
+& RefCOCO & RefCOCO+ & RefCOCOg & MeViS & Ref-YTVOS & Ref-DAVIS17 & ReVOS & MME (A/B,+) & MMBench & SEED & Video-MME & \\
 \midrule
-LLaVA-1.5-13B & -- & -- & -- & -- & -- & -- & 1531(+) & 68.8 & 70.1 & -- & 98.2 \\
-Video-LLaVA-7B & -- & -- & -- & -- & -- & -- & -- & 60.9 & -- & 39.9 & 94.6 \\
-LLaMA-VID-7B & -- & -- & -- & -- & -- & -- & 1521(+) & 65.1 & 59.9 & -- & 91.0 \\
-mPLUG-Owl3-8B & -- & -- & -- & -- & -- & -- & -- & 77.6 & -- & 53.5 & 123.9 \\
-InternVL2-8B & -- & -- & -- & -- & -- & -- & -- & 81.7 & 76.2 & 54.0 & 124.2 \\
+LLaVA-1.5-13B & -- & -- & -- & -- & -- & -- & -- & 1531(+) & 68.8 & 70.1 & -- & 98.2 \\
+Video-LLaVA-7B & -- & -- & -- & -- & -- & -- & -- & -- & 60.9 & -- & 39.9 & 94.6 \\
+LLaMA-VID-7B & -- & -- & -- & -- & -- & -- & -- & 1521(+) & 65.1 & 59.9 & -- & 91.0 \\
+mPLUG-Owl3-8B & -- & -- & -- & -- & -- & -- & -- & -- & 77.6 & -- & 53.5 & 123.9 \\
+InternVL2-8B & -- & -- & -- & -- & -- & -- & -- & -- & 81.7 & 76.2 & 54.0 & 124.2 \\
 \midrule
-PixelLM-7B & 73.0 & 66.3 & 69.3 & -- & -- & -- & 309/135 & 17.4 & -- & -- & 67.1 \\
-LaSagnA & 76.8 & 66.4 & 70.6 & -- & -- & -- & 0/0 & 0.0 & -- & -- & 58.4 \\
-LISA-7B & 74.1 & 62.4 & 66.4 & -- & -- & -- & 1/1 & 0.4 & -- & -- & 55.5 \\
-GLaMM-7B & 79.5 & 72.6 & 74.2 & -- & -- & -- & 14/9 & 36.8 & -- & -- & 72.9 \\
-LLaVA-G-7B & 77.1 & 68.8 & 71.5 & -- & -- & -- & -- & -- & -- & -- & 99.0 \\
-GSVA-13B & 79.2 & 70.3 & 75.7 & -- & -- & -- & -- & -- & -- & -- & 102.5 \\
-OMG-LLaVA-7B & 78.0 & 69.1 & 72.9 & -- & -- & -- & 1177/235 & 47.9 & 56.5 & -- & 89.5 \\
-VideoLISA-3.8B & 73.8 & 63.4 & 68.3 & 68.8 & -- & 63.7 & -- & -- & -- & -- & 96.4 \\
-VISA-13B & 72.4 & 59.8 & 65.5 & 70.4 & 50.9 & 63.0 & -- & -- & -- & -- & 96.8 \\
+PixelLM-7B & 73.0 & 66.3 & 69.3 & -- & -- & -- & -- & 309/135 & 17.4 & -- & -- & 67.1 \\
+LaSagnA & 76.8 & 66.4 & 70.6 & -- & -- & -- & -- & 0/0 & 0.0 & -- & -- & 58.4 \\
+LISA-7B & 74.1 & 62.4 & 66.4 & -- & -- & -- & -- & 1/1 & 0.4 & -- & -- & 55.5 \\
+GLaMM-7B & 79.5 & 72.6 & 74.2 & -- & -- & -- & -- & 14/9 & 36.8 & -- & -- & 72.9 \\
+LLaVA-G-7B & 77.1 & 68.8 & 71.5 & -- & -- & -- & -- & -- & -- & -- & -- & 99.0 \\
+GSVA-13B & 79.2 & 70.3 & 75.7 & -- & -- & -- & -- & -- & -- & -- & -- & 102.5 \\
+OMG-LLaVA-7B & 78.0 & 69.1 & 72.9 & -- & -- & -- & -- & 1177/235 & 47.9 & 56.5 & -- & 89.5 \\
+VideoLISA-3.8B & 73.8 & 63.4 & 68.3 & -- & 63.7 & 68.8 & -- & -- & -- & -- & -- & 96.4 \\
+VISA-13B & 72.4 & 59.8 & 65.5 & -- & 63.0 & 70.4 & 50.9 & -- & -- & -- & -- & 96.8 \\
 \midrule
-Sa2VA-1B (100\%) & 77.4 & 69.9 & 72.3 & 72.3 & 47.6 & 65.3 & 1381/405 & 68.3 & 64.8 & 39.9 & 100.0 \\
+Sa2VA-1B (100\%) & 77.4 & 69.9 & 72.3 & 41.7 & 65.3 & 72.3 & 47.6 & 1381/405 & 68.3 & 64.8 & 39.9 & 100\% \\
 \midrule
-Sa2VA-Select-1B (40\%) & 77.5 & 69.1 & 74.8 & 71.0 & 51.2 & 66.2 & 1403/384 & 66.1 & 69.3 & 40.4 & 101.5 \\
+Sa2VA-Select-1B (40\%) & 77.5 & 69.1 & 74.8 & 44.9 & 66.2 & 71.0 & 51.2 & 1403/384 & 66.1 & 69.3 & 40.4 & 102\% \\
+Sa2VA-Select-1B (30\%) & 77.4 & 69.6 & 74.6 & 43.5 & 67.0 & 70.6 & 51.3 & 1388/399 & 66.8 & 68.0 & 41.4 & 102\% \\
+Sa2VA-Select-1B (20\%) & 75.7 & 66.1 & 72.3 & 44.0 & 66.5 & 69.3 & 50.2 & 1357/365 & 64.1 & 66.1 & 38.9 & 99.2\% \\
+Sa2VA-Select-1B (10\%) & 76.1 & 65.8 & 72.7 & 42.5 & 65.2 & 68.0 & 48.1 & 1345/333 & 63.0 & 63.7 & 36.3 & 96.9\% \\
 \bottomrule
 \end{tabular}%
 }
@@ -118,13 +121,15 @@ Sa2VA-Select-1B (40\%) & 77.5 & 69.1 & 74.8 & 71.0 & 51.2 & 66.2 & 1403/384 & 66
 \subsection{Ref-SAV validation results}
 \label{sec:exp_refsav}
 Table~\ref{tab:refsav_dev} reports Ref-SAV validation performance at different retention ratios and compares our 1B model with the Sa2VA-8B results reported in the original Sa2VA paper.
-A notable observation is that Sa2VA-Select-1B remains strong even under aggressive compression.
-At 20\% retention, it achieves the best overall J\&F of 57.6, surpassing both Sa2VA-8B (50.0) and zero-shot Sa2VA-8B (41.3) under our evaluation protocol.
-Performance is also relatively stable across $\rho\in\{0.1,0.2,0.3,0.4\}$, suggesting that the selector is not overly sensitive to the exact operating budget on this benchmark.
-This robustness is encouraging because it indicates that the learned ranking can preserve video grounding evidence even when the retained token set is small.
+Two observations stand out.
+First, Sa2VA-Select-1B remains strong even under aggressive compression: at 20\% retention, it achieves the best overall J\&F of 57.6, surpassing both Sa2VA-8B (50.0) and zero-shot Sa2VA-8B (41.3) under our evaluation protocol.
+Second, performance is relatively stable across $\rho\in\{0.1,0.2,0.3,0.4\}$, suggesting that the learned ranking is not overly sensitive to the exact operating budget on this benchmark.
+This robustness is encouraging because it indicates that the transferred selector can preserve video grounding evidence even when the retained token set is small.
 
 \begin{table}[t]
-\caption{Ref-SAV validation results (J, F, and J\&F). ``zs'' denotes zero-shot; Sa2VA-8B numbers are from the Sa2VA paper.}
+\caption{Ref-SAV validation results.
+We report J, F, and J\&F on the long, short, and overall splits.
+``zs'' denotes zero-shot, and the Sa2VA-8B results are taken from the original Sa2VA paper.}
 \label{tab:refsav_dev}
 \centering
 \footnotesize
@@ -148,10 +153,10 @@ Sa2VA-Select-1B ($\rho$=0.1) & 63.4 & 65.6 & 64.5 & 48.0 & 49.6 & 48.8 & 55.7 & 
 \end{table}
 
 \begin{table*}[t]
-\caption{Performance on image-level benchmarks with MLLMs that have segmentation capability (adapted from Table~7 style).
+\caption{Performance on image-level benchmarks for MLLMs with segmentation capability, adapted from the original Sa2VA image-level summary table.
 We report standard scores for MMBench, SEED-Bench, AI2D, MMStar, MMMU, and SQA$^{\mathrm{test}}$, and cIoU for RefCOCO/RefCOCO+/RefCOCOg.
 For MME, A/B denotes the perception (A) and cognition (B) scores, respectively.
-For Sa2VA-Select-1B, we additionally report the relative percentage w.r.t. Sa2VA-1B (100\%) under each metric.}
+The ``Avg'' column reports the relative average w.r.t. Sa2VA-1B (100\%).}
 \label{tab:image_level_bench_sa2va1b_dev}
 \centering
 \scriptsize
@@ -159,13 +164,169 @@ For Sa2VA-Select-1B, we additionally report the relative percentage w.r.t. Sa2VA
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{lccccccccccc}
 \toprule
-Method & MME (A/B) & MMBench & SEED & AI2D & MMStar & MMMU & SQA$^{\mathrm{test}}$ & RefCOCO & RefCOCO+ & RefCOCOg & Avg \\
+Method & MME (A/B) & MMBench & SEED-Bench & AI2D & MMStar & MMMU & SQA$^{\mathrm{test}}$ & RefCOCO & RefCOCO+ & RefCOCOg & Avg \\
 \midrule
 Sa2VA-1B (100\%) & 1381/405 & 68.3 & 64.8 & 69.2 & 48.7 & 38.7 & 90.1 & 77.4 & 69.9 & 72.3 & 100\% \\
-Sa2VA-Select-1B (40\%) & \shortstack{1403/384\\(100.1\%)} & \shortstack{66.1\\(96.8\%)} & \shortstack{69.3\\(106.9\%)} & \shortstack{64.3\\(92.9\%)} & \shortstack{46.3\\(95.1\%)} & \shortstack{36.6\\(94.6\%)} & \shortstack{85.7\\(95.1\%)} & \shortstack{77.5\\(100.1\%)} & \shortstack{69.1\\(98.9\%)} & \shortstack{74.8\\(103.5\%)} & 98.4\% \\
-Sa2VA-Select-1B (30\%) & \shortstack{1388/399\\(100.1\%)} & \shortstack{66.8\\(97.8\%)} & \shortstack{68.0\\(104.9\%)} & \shortstack{62.9\\(90.1\%)} & \shortstack{45.8\\(94.0\%)} & \shortstack{36.1\\(93.3\%)} & \shortstack{86.0\\(95.4\%)} & \shortstack{77.4\\(100.0\%)} & \shortstack{69.6\\(99.6\%)} & \shortstack{74.6\\(103.2\%)} & 97.8\% \\
-Sa2VA-Select-1B (20\%) & \shortstack{1357/365\\(96.4\%)} & \shortstack{64.1\\(93.9\%)} & \shortstack{66.1\\(102.0\%)} & \shortstack{59.3\\(85.7\%)} & \shortstack{43.1\\(88.5\%)} & \shortstack{35.9\\(92.8\%)} & \shortstack{82.9\\(92.0\%)} & \shortstack{75.7\\(97.8\%)} & \shortstack{66.1\\(94.6\%)} & \shortstack{72.3\\(100.0\%)} & 94.4\% \\
-Sa2VA-Select-1B (10\%) & \shortstack{1345/333\\(94.0\%)} & \shortstack{63.0\\(92.2\%)} & \shortstack{63.7\\(98.3\%)} & \shortstack{57.9\\(83.7\%)} & \shortstack{41.3\\(84.8\%)} & \shortstack{34.1\\(88.1\%)} & \shortstack{83.9\\(93.1\%)} & \shortstack{76.1\\(98.3\%)} & \shortstack{65.8\\(94.1\%)} & \shortstack{72.7\\(100.6\%)} & 92.7\% \\
+Sa2VA-Select-1B (40\%) & 1403/384 & 66.1 & \textbf{69.3} & 64.3 & 46.3 & 36.6 & 85.7 & 77.5 & 69.1 & \textbf{74.8} & 98.4\% \\
+Sa2VA-Select-1B (30\%) & 1388/399 & 66.8 & 68.0 & 62.9 & 45.8 & 36.1 & \textbf{86.0} & 77.4 & \textbf{69.6} & 74.6 & 97.8\% \\
+Sa2VA-Select-1B (20\%) & 1357/365 & 64.1 & 66.1 & 59.3 & 43.1 & 35.9 & 82.9 & 75.7 & 66.1 & 72.3 & 94.4\% \\
+Sa2VA-Select-1B (10\%) & 1345/333 & 63.0 & 63.7 & 57.9 & 41.3 & 34.1 & 83.9 & 76.1 & 65.8 & 72.7 & 92.7\% \\
+\bottomrule
+\end{tabular}%
+}
+\end{table*}
+
+\subsection{Qualitative analysis}
+\label{sec:exp_qualitative}
+We further analyze representative video cases to understand \emph{why} Sa2VA-Select improves unified dense grounding.
+Rather than treating the qualitative results as isolated success examples, we group them by recurring failure modes of the Sa2VA-1B baseline.
+Across both ReVOS and MeViS, the dominant pattern is that the full visual stream often contains strong distractor evidence that can interfere with target grounding, especially when the target is small, partially visible, temporally delayed, or described by relational cues such as left/right position.
+
+\paragraph{Distractor-dominant confusion.}
+The first group of cases highlights failures caused by visually salient but semantically irrelevant objects.
+In these examples, baseline predictions are easily pulled toward larger, more persistent, or more visually dominant regions, while the referred target occupies only a small part of the scene or is specified through a subtle relational cue.
+Figure~\ref{fig:qual_distractor} makes this failure mode concrete.
+In the LV-VIS case ``the yellow dog(s) on the left side of the frame'', the relational cue ``left side'' is easy to override when another dog occupies a larger and more visually dominant region; the Sa2VA-1B baseline indeed drifts toward the dominant dog, whereas Sa2VA-Select keeps tracking the referred left-side dog and improves J\&F from 23.8 to 98.2.
+In the MOSE case ``Which object is a cat with a tail of black and white stripes but its body cannot be seen?'', the referred target is a subtle striped tail rather than the more obvious cat body, so the baseline is repeatedly attracted to the salient foreground kitten and reaches only 2.9 J\&F, while Sa2VA-Select recovers the intended fine-grained target and reaches 90.5 J\&F.
+These examples support the hypothesis that compatible learnable selection suppresses redundant distractor evidence and retains features that are more informative for target identity, spatial relation, and fine-grained grounding.
+
+\begin{figure*}[t]
+\centering
+\captionsetup{font=small}
+\setlength{\tabcolsep}{1.0pt}
+\renewcommand{\arraystretch}{0.9}
+\begin{tabular}{c ccc ccc}
+& \multicolumn{3}{c}{\textbf{MOSE (striped-tail cat)}} & \multicolumn{3}{c}{\textbf{LV-VIS (left-side dog)}} \\
+& \scriptsize 00008 & \scriptsize 00014 & \scriptsize 00021 & \scriptsize 00005 & \scriptsize 00010 & \scriptsize 00018 \\
+\scriptsize\textbf{Frame}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_56/frames/00008.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_56/frames/00014.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_56/frames/00021.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_14/frames/00005.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_14/frames/00010.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_14/frames/00018.png} \\
+\scriptsize\textbf{Baseline}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_56/baseline_overlay/00008.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_56/baseline_overlay/00014.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_56/baseline_overlay/00021.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_14/baseline_overlay/00005.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_14/baseline_overlay/00010.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_14/baseline_overlay/00018.png} \\
+\scriptsize\textbf{Ours}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_56/ours_overlay/00008.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_56/ours_overlay/00014.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_56/ours_overlay/00021.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_14/ours_overlay/00005.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_14/ours_overlay/00010.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_14/ours_overlay/00018.png} \\
+\scriptsize\textbf{GT}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_56/gt_overlay/00008.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_56/gt_overlay/00014.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_56/gt_overlay/00021.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_14/gt_overlay/00005.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_14/gt_overlay/00010.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/a/exp_14/gt_overlay/00018.png} \\
+\end{tabular}
+\caption{Qualitative examples of distractor-dominant confusion on ReVOS. The Sa2VA-1B baseline is often pulled toward larger or more visually salient regions, while Sa2VA-Select stays closer to the referred target and ground truth.}
+\label{fig:qual_distractor}
+\end{figure*}
+
+\paragraph{Early mis-tracking and occlusion-induced drift.}
+The second group highlights temporal failures.
+When the target is absent or weakly visible in early frames, an incorrect early association can derail later tracking, and the error is further amplified by occlusion, crossing motion, or pose change.
+Figure~\ref{fig:qual_temporal} illustrates two variants of this temporal instability.
+In the MeViS case ``The young boy heading to hold the little dog'', the target boy is not the most visually dominant object at the beginning of the sequence, so an early wrong association can bias later tracking toward the nearby dog or clutter around it; Sa2VA-Select keeps the target identity more stable over time and improves J\&F from 25.7 to 90.0.
+In the horse-turning MeViS case ``The horse initially facing right, then makes a leftward turn'', pose change and partial overlap between nearby horses make the baseline vulnerable to drift once the motion pattern changes; Sa2VA-Select remains substantially closer to the ground truth through the turn and improves J\&F from 37.4 to 80.7.
+These examples suggest that selector-guided pruning is beneficial not only for static spatial disambiguation, but also for stabilizing target evidence over time in unified video grounding under delayed emergence, occlusion, and motion-induced ambiguity.
+
+\begin{figure*}[t]
+\centering
+\captionsetup{font=small}
+\setlength{\tabcolsep}{1.0pt}
+\renewcommand{\arraystretch}{0.9}
+\begin{tabular}{c ccc ccc}
+& \multicolumn{3}{c}{\textbf{MeViS (boy to dog)}} & \multicolumn{3}{c}{\textbf{MeViS (horse turning)}} \\
+& \scriptsize 00010 & \scriptsize 00018 & \scriptsize 00031 & \scriptsize 00019 & \scriptsize 00035 & \scriptsize 00057 \\
+\scriptsize\textbf{Frame}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_9/frames/00010.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_9/frames/00018.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_9/frames/00031.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_12/frames/00019.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_12/frames/00035.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_12/frames/00057.png} \\
+\scriptsize\textbf{Baseline}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_9/baseline_overlay/00010.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_9/baseline_overlay/00018.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_9/baseline_overlay/00031.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_12/baseline_overlay/00019.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_12/baseline_overlay/00035.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_12/baseline_overlay/00057.png} \\
+\scriptsize\textbf{Ours}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_9/ours_overlay/00010.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_9/ours_overlay/00018.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_9/ours_overlay/00031.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_12/ours_overlay/00019.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_12/ours_overlay/00035.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_12/ours_overlay/00057.png} \\
+\scriptsize\textbf{GT}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_9/gt_overlay/00010.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_9/gt_overlay/00018.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_9/gt_overlay/00031.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_12/gt_overlay/00019.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_12/gt_overlay/00035.png}
+& \includegraphics[width=0.143\textwidth]{figure/qualitative/b/exp_12/gt_overlay/00057.png} \\
+\end{tabular}
+\caption{Qualitative examples of early mis-tracking and occlusion-induced drift on MeViS. Under delayed emergence, pose change, or partial occlusion, Sa2VA-Select tracks the intended target more consistently than the Sa2VA-1B baseline.}
+\label{fig:qual_temporal}
+\end{figure*}
+
+\paragraph{Takeaway.}
+Taken together, the qualitative results support the same conclusion as the quantitative tables: the gains of Sa2VA-Select are not merely numerical fluctuations.
+Instead, the compatible selector appears to reduce distractor-driven grounding errors in two practically important regimes, namely visually dominant distractor confusion and temporal drift under occlusion or delayed target emergence.
+
+\subsection{Ablation study}
+\label{sec:exp_ablation}
+We next examine which parts of Sa2VA-Select are responsible for the gains observed in the main results.
+All ablation runs in this subsection use the same 30\% visual token budget so that differences can be attributed to the selector design rather than to the retention ratio itself.
+We compare the plain Sa2VA-1B baseline, a selector without curriculum annealing, and several CAS schedules with increasing end weights.
+The goal is to clarify whether the gains come merely from introducing a scorer and a pruning budget, or from the compatibility between soft training-time selection and hard inference-time pruning.
+
+\paragraph{Effect of CAS and schedule strength.}
+Table~\ref{tab:ablation_budget30} shows a clear trend.
+Using LIS+DiffTopK alone already yields a workable selector, but the fixed-$\lambda_t$ variants remain below the baseline on most dense grounding metrics.
+This suggests that simply adding a scorer and a budget constraint is not sufficient: in Sa2VA, the retained tokens must jointly support both language generation and segmentation-oriented \texttt{[SEG]} prediction, so a prematurely hard alignment between train-time soft and inference-time hard masks can over-constrain optimization.
+Adding CAS with an annealed schedule substantially improves performance, indicating that the selector benefits from first learning task-relevant token rankings under soft selection and only later being encouraged to match hard Top-$k$ behavior more strictly.
+Among the tested schedules, $\lambda_t:0.1\!\sim\!3$ gives the best overall average (101.6\%) and the best ReVOS score (51.3), while remaining competitive on RefCOCO and DAVIS.
+This result is consistent with the intuition that a stronger late-stage constraint helps reduce the train--test gap for actual inference-time pruning, especially on video benchmarks where temporal evidence can be more fragile under token removal.
+Interestingly, the milder $0.1\!\sim\!1$ schedule produces the best RefCOCOg score (74.7), suggesting that image-level grounding may prefer a slightly softer final constraint even though the overall cross-task trade-off is best at $0.1\!\sim\!3$.
+Overall, these results support our design choice of combining UVT-LIS, DiffTopK, and CAS rather than relying on fixed-weight constraint matching alone, and they reinforce the role of CAS as a compatibility mechanism between train-time soft selection and inference-time hard pruning.
+
+\paragraph{Suggested companion visualization.}
+To complement Table~\ref{tab:ablation_budget30}, a compact ablation figure can plot the Avg score against the final CAS schedule strength, using the sequence \emph{no CAS}, fixed-$3$, $0.1\!\sim\!1$, $0.1\!\sim\!2$, and $0.1\!\sim\!3$.
+The intended message is not merely that ``more constraint is better,'' but that \emph{annealed} constraint matching is the key factor: fixed strong weighting underperforms, whereas progressively increasing the constraint recovers and then exceeds the Sa2VA baseline under the same 30\% budget.
+If space is limited, this can remain a table-only result in the main paper and be converted into a one-dimensional line plot for the appendix or rebuttal material.
+
+\begin{table*}[t]
+\caption{Ablation study of Sa2VA-Select under a fixed 30\% visual token budget.
+We compare the Sa2VA-1B baseline, a selector with LIS+DiffTopK but without CAS, and several CAS schedules with different $\lambda_t$ ranges.
+We report cIoU for image referring segmentation, J\&F for video referring segmentation, and relative average performance with respect to the Sa2VA-1B baseline (100\%).}
+\label{tab:ablation_budget30}
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.0pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lccccccccc}
+\toprule
+\multirow{2}{*}{Config} & \multicolumn{2}{c}{Modules} & \multirow{2}{*}{$\lambda_t$} & \multicolumn{3}{c}{Image Seg (cIoU)} & \multicolumn{2}{c}{Video Seg (J\&F)} & \multirow{2}{*}{Avg} \\
+\cmidrule(lr){2-3} \cmidrule(lr){5-7} \cmidrule(lr){8-9}
+& LIS + DiffTopK & CAS & & RefCOCO & RefCOCO+ & RefCOCOg & Ref-DAVIS17 & ReVOS & \\
+\midrule
+baseline & -- & -- & -- & 77.4 & 69.9 & 72.3 & \textbf{72.3} & 47.6 & 100\% \\
+1 & $\checkmark$ & -- & 1 (fixed) & 75.2 & 64.7 & 71.6 & 70.5 & 48.6 & 97.7\% \\
+2 & $\checkmark$ & $\checkmark$ & 3 (fixed) & 73.7 & 62.5 & 68.7 & 68.8 & 48.4 & 95.3\% \\
+3 & $\checkmark$ & $\checkmark$ & $0.1\!\sim\!1$ & \textbf{77.4} & 68.7 & \textbf{74.7} & 69.2 & 50.1 & 100.5\% \\
+4 & $\checkmark$ & $\checkmark$ & $0.1\!\sim\!2$ & 76.1 & 66.4 & 72.1 & 70.6 & 49.4 & 98.9\% \\
+ours & $\checkmark$ & $\checkmark$ & $0.1\!\sim\!3$ & \textbf{77.4} & \textbf{69.6} & 74.6 & 70.6 & \textbf{51.3} & \textbf{101.6\%} \\
 \bottomrule
 \end{tabular}%
 }
@@ -182,14 +343,14 @@ Table~\ref{tab:efficiency_mevis} summarizes the performance--efficiency trade-of
 As expected, lower retention consistently reduces peak memory and prefill time.
 The smallest memory footprint is obtained at 10\% retention (2.37~GB), and the fastest prefill is also obtained at 10\% (34.78~ms).
 The best E2E latency is achieved at 20\% retention (204.96~ms), slightly below the Sa2VA-1B baseline (216.12~ms).
-At the same time, 30--40\% retention tends to preserve stronger dense grounding performance, especially on video benchmarks, but does not always minimize total latency.
-This result highlights an important practical point: the most accurate retention ratio is not necessarily the most efficient one, so deployment should choose the operating point according to the target application.
-More broadly, the table shows that Sa2VA-Select exposes a controllable trade-off surface rather than a single fixed compression setting.
+At the same time, 30--40\% retention preserves stronger dense grounding performance, especially on video benchmarks, but does not always minimize total latency.
+This result highlights an important practical point: the most accurate retention ratio is not necessarily the most efficient one, so the operating point should be chosen according to the deployment target.
+More broadly, Table~\ref{tab:efficiency_mevis} shows that Sa2VA-Select exposes a controllable trade-off surface rather than a single fixed compression setting.
 
 \begin{table*}[t]
 \caption{Efficiency and performance trade-offs across retention ratios for Sa2VA-Select-1B.
 We report cIoU for image referring segmentation, J\&F for video referring segmentation, and efficiency measured on MeViS (val\_u).
-Percentages are relative to the Sa2VA-1B baseline (100\%).}
+The ``Avg'' column reports relative segmentation performance with respect to the Sa2VA-1B baseline (100\%).}
 \label{tab:efficiency_mevis}
 \centering
 \scriptsize
@@ -199,13 +360,13 @@ Percentages are relative to the Sa2VA-1B baseline (100\%).}
 \toprule
 \multirow{2}{*}{Method} & \multicolumn{3}{c}{Image Seg (cIoU)} & \multicolumn{2}{c}{Video Seg (J\&F)} & \multicolumn{1}{c}{Perf.} & \multicolumn{3}{c}{Efficiency on MeViS (val\_u)} \\
 \cmidrule(lr){2-4} \cmidrule(lr){5-6} \cmidrule(lr){8-10}
-& RefCOCO & RefCOCO+ & RefCOCOg & DAVIS & MeViS (val\_u) & Avg & Max GPU (GB) & Prefill (ms) & E2E (ms) \\
+& RefCOCO & RefCOCO+ & RefCOCOg & Ref-DAVIS17 & MeViS (val\_u) & Avg & Max GPU (GB) & Prefill (ms) & E2E (ms) \\
 \midrule
 Sa2VA-1B & 77.4 & 69.9 & 72.3 & 72.3 & 50.8 & 100.0\% & 2.76 & 40.16 & 216.12 \\
-Sa2VA-Select-1B (40\%) & \shortstack{77.5\\(100.1\%)} & \shortstack{69.1\\(98.9\%)} & \shortstack{74.8\\(103.5\%)} & \shortstack{71.0\\(98.2\%)} & \shortstack{52.2\\(102.8\%)} & 100.7\% & 2.50 & 38.17 & 238.80 \\
-Sa2VA-Select-1B (30\%) & \shortstack{77.4\\(100.0\%)} & \shortstack{69.6\\(99.6\%)} & \shortstack{74.6\\(103.2\%)} & \shortstack{70.6\\(97.6\%)} & \shortstack{47.6\\(93.7\%)} & 98.8\% & 2.46 & 35.14 & 243.08 \\
-Sa2VA-Select-1B (20\%) & \shortstack{75.7\\(97.8\%)} & \shortstack{66.1\\(94.6\%)} & \shortstack{72.3\\(100.0\%)} & \shortstack{69.3\\(95.9\%)} & \shortstack{52.1\\(102.6\%)} & 98.2\% & 2.42 & 35.64 & \textbf{204.96} \\
-Sa2VA-Select-1B (10\%) & \shortstack{77.4\\(100.0\%)} & \shortstack{69.6\\(99.6\%)} & \shortstack{74.6\\(103.2\%)} & \shortstack{68.0\\(94.1\%)} & \shortstack{51.9\\(102.2\%)} & 98.8\% & \textbf{2.37} & \textbf{34.78} & 241.19 \\
+Sa2VA-Select-1B (40\%) & 77.5 & 69.1 & \textbf{74.8} & \textbf{71.0} & \textbf{52.2} & \textbf{100.7\%} & 2.50 & 38.17 & 238.80 \\
+Sa2VA-Select-1B (30\%) & \textbf{77.4} & \textbf{69.6} & 74.6 & 70.6 & 47.6 & 98.8\% & 2.46 & 35.14 & 243.08 \\
+Sa2VA-Select-1B (20\%) & 75.7 & 66.1 & 72.3 & 69.3 & 52.1 & 98.2\% & 2.42 & 35.64 & \textbf{204.96} \\
+Sa2VA-Select-1B (10\%) & 77.4 & 69.6 & 74.6 & 68.0 & 51.9 & 98.8\% & \textbf{2.37} & \textbf{34.78} & 241.19 \\
 \bottomrule
 \end{tabular}%
 }
