@@ -58,10 +58,6 @@ venv/
 # Build outputs
 *.pdf
 
-# Paper figures (tracked assets)
-!figure/*.pdf
-!figure/**/*.pdf
-
 # exclude png, but include json
 figure/**/*.png
 
@@ -71,3 +67,7 @@ figure/**/*.png
 # LDF Images
 paper_pdf/pdf_images/
 paper_pdf/
+
+# exclude pdf
+figure/*.pdf
+figure/**/*.pdf

@@ -1,0 +1,6 @@
+method	retention_ratio_pct	retention_ratio_decimal	is_baseline	avg_relative_perf_pct	seg_perf_relative_pct	ref_davis17_jf	revos_jf	mevis_main_jf	mevis_val_u_jf	refcoco_ciou	refcocop_ciou	refcocog_ciou	max_gpu_gb	prefill_ms	e2e_ms
+Sa2VA-1B	100	1.0	1	100.0	100.0	72.3	47.6	41.7	50.8	77.4	69.9	72.3	2.76	40.16	216.12
+Sa2VA-Select-1B (40%)	40	0.4	0	102.0	100.7	71.0	51.2	44.9	52.2	77.5	69.1	74.8	2.50	38.17	238.80
+Sa2VA-Select-1B (30%)	30	0.3	0	102.0	98.8	70.6	51.3	43.5	47.6	77.4	69.6	74.6	2.46	35.14	243.08
+Sa2VA-Select-1B (20%)	20	0.2	0	99.2	98.2	69.3	50.2	44.0	52.1	75.7	66.1	72.3	2.42	35.64	204.96
+Sa2VA-Select-1B (10%)	10	0.1	0	96.9	98.8	68.0	48.1	42.5	51.9	76.1	65.8	72.7	2.37	34.78	241.19

@@ -190,7 +190,7 @@ In the LV-VIS case ``the yellow dog(s) on the left side of the frame'', the rela
 In the MOSE case ``Which object is a cat with a tail of black and white stripes but its body cannot be seen?'', the referred target is a subtle striped tail rather than the more obvious cat body, so the baseline is repeatedly attracted to the salient foreground kitten and reaches only 2.9 J\&F, while Sa2VA-Select recovers the intended fine-grained target and reaches 90.5 J\&F.
 These examples support the hypothesis that compatible learnable selection suppresses redundant distractor evidence and retains features that are more informative for target identity, spatial relation, and fine-grained grounding.
 
-\begin{figure*}[t]
+\begin{figure*}[b]
 \centering
 \captionsetup{font=small}
 \setlength{\tabcolsep}{1.0pt}
@@ -346,6 +346,24 @@ The best E2E latency is achieved at 20\% retention (204.96~ms), slightly below t
 At the same time, 30--40\% retention preserves stronger dense grounding performance, especially on video benchmarks, but does not always minimize total latency.
 This result highlights an important practical point: the most accurate retention ratio is not necessarily the most efficient one, so the operating point should be chosen according to the deployment target.
 More broadly, Table~\ref{tab:efficiency_mevis} shows that Sa2VA-Select exposes a controllable trade-off surface rather than a single fixed compression setting.
+
+\paragraph{Trade-off frontier.}
+Figure~\ref{fig:tradeoff_panels} makes the operating region more explicit.
+In the performance panel, both the overall relative average and the ReVOS curve peak in the 30--40\% retention range, indicating that moderate pruning preserves the strongest dense grounding quality in our current setting.
+In the efficiency panel, maximum GPU memory decreases steadily as the retained token budget becomes smaller, while prefill time drops sharply from 40\% to 30\% and then becomes relatively stable.
+Taken together, the two panels identify the same preferred operating region: 30--40\% retention already delivers substantial efficiency gains while remaining the most favorable regime for dense grounding performance.
+This result reinforces the main practical takeaway of Sa2VA-Select: rather than producing a single universally optimal compression point, the model exposes a controllable frontier between grounding quality and inference cost.
+
+\begin{figure*}[t]
+\centering
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{cc}
+\includegraphics[width=0.48\textwidth]{figure/trade-off/panel1.png} &
+\includegraphics[width=0.48\textwidth]{figure/trade-off/panel2.png} \\
+\end{tabular}
+\caption{Performance--efficiency trade-offs across visual token retention ratios for Sa2VA-Select-1B. Left: the overall relative average and ReVOS both identify 30--40\% retention as the most favorable performance region. Right: maximum GPU memory decreases steadily with stronger pruning, while prefill time improves most visibly from 40\% to 30\% and then becomes relatively stable. Together, the two panels show that 30--40\% retention is the preferred operating region in our current experiments.}
+\label{fig:tradeoff_panels}
+\end{figure*}
 
 \begin{table*}[t]
 \caption{Efficiency and performance trade-offs across retention ratios for Sa2VA-Select-1B.

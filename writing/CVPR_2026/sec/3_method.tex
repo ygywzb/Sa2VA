@@ -5,11 +5,19 @@ We present Sa2VA-Select, a compatible extension of Sa2VA that transfers learnabl
 Our goal is not to redesign Sa2VA's task interface, but to reduce the visual token budget while preserving the evidence most useful for generating accurate \texttt{[SEG]} tokens and maintaining the model's joint segmentation-and-conversation capability.
 To this end, we instantiate the selector with three components adopted in a Sa2VA-compatible manner: a Unified Visual Token-oriented Learnable Importance Scorer (UVT-LIS), a train-time differentiable Top-$k$ relaxation (DiffTopK), and a curriculum annealing strategy (CAS) that narrows the gap between train-time soft selection and inference-time hard pruning.
 
+\paragraph{Method focus.}
+The core methodological question is not whether visual token selection can work in isolation, but whether it can be inserted into Sa2VA without breaking the very properties that make Sa2VA useful as a unified dense grounded model.
+In particular, the selected token subset must remain sufficient for two coupled objectives: the MLLM still needs enough evidence to produce instruction-aware language outputs, and the resulting \texttt{[SEG]} tokens must still carry reliable target cues for downstream mask decoding.
+This requirement makes our setting more delicate than standard multimodal QA compression, where moderate token loss may still preserve the final text answer even if some spatial detail is discarded.
+
 \subsection{Overview}
 \label{sec:method_overview}
 Sa2VA-Select targets \emph{unified dense grounded understanding}, where the same model must support both pixel-level prediction and language generation over images and videos.
 In Sa2VA, visual inputs and visual prompts are converted into a unified visual stream that is consumed by the MLLM, and the MLLM produces \texttt{[SEG]} tokens that act as segmentability cues for SAM2.
 This makes the pre-LLM visual stream a natural intervention point: it already contains the fused evidence needed by downstream decoding, yet it is also the source of a substantial compute and memory burden.
+Choosing this insertion point has two advantages.
+First, it avoids modifying Sa2VA's downstream task interface, which means the selector can be evaluated as a compatible module rather than as a full architectural redesign.
+Second, it lets the selector rank all visual evidence under a common budget after fusion, including both ordinary visual context and prompt-conditioned grounding cues, instead of pruning only one branch in isolation.
 
 Following the baseline abstraction, for an instance $i$ with input text tokens $T_i$, image/video input (denoted as $I_i$ or $V_i$), and additional visual prompt tokens $VP_i$, the model outputs answer tokens $T_o$ and optionally masks (or masklets) $M_o$:
 \begin{equation}
@@ -23,6 +31,12 @@ Our design inserts a budgeted selector between Sa2VA's fused visual representati
 During training, the selector uses train-time soft selection so that downstream supervision can update token importance scores end-to-end.
 During inference, it switches to hard Top-$k$ pruning so that the reduced token count corresponds to actual efficiency gains.
 Figure~\ref{fig:framework} summarizes the full training and inference pipeline. In particular, the figure highlights that the selector operates on Sa2VA's unified visual tokens, uses soft selection together with a hard-mask target during training, and switches to hard selection at inference for actual token pruning.
+
+\paragraph{Why unified-stream selection is nontrivial.}
+In a unified dense grounded model, not all visually redundant tokens are truly redundant for downstream behavior.
+A token that seems unimportant for coarse semantic recognition may still help preserve a small target region, a left/right relational cue, or the temporal continuity needed for later tracking.
+Conversely, visually dominant tokens may consume a disproportionate share of the budget while contributing mostly distractor evidence.
+Sa2VA-Select is designed around this observation: the selector should not merely keep the most salient tokens globally, but should learn which tokens are useful for preserving instruction-conditioned dense grounding behavior inside Sa2VA.
 
 \paragraph{Notation.}
 Let $\mathbf{V}\in\mathbb{R}^{N\times D}$ denote the unified visual token features required by the LLM, where $N$ is the number of tokens and $D$ is the feature dimension.
@@ -57,6 +71,9 @@ The masked thumbnail is then encoded and appended to the original Sa2VA visual t
 Here $\mathbf{X}^{\mathrm{vis}}$ includes full image/video tokens and thumbnail tokens, while $\mathbf{X}^{\mathrm{vp}}$ encodes the VP-masked thumbnail.
 For clarity, we denote this fused stream as $\mathbf{V}$ when describing token selection.
 Applying selection at this stage allows the selector to jointly rank ordinary visual evidence and VP-conditioned evidence under a shared budget.
+This is an important design choice.
+If selection were applied before fusion, the model would need separate pruning rules for different visual branches, and it would be harder to compare the relative utility of contextual tokens and prompt-conditioned tokens.
+By operating after fusion, Sa2VA-Select leaves the baseline visual encoding pathway intact and frames the problem as budget allocation over the exact visual evidence that the MLLM would otherwise consume.
 
 \subsection{Unified visual token-oriented learnable importance scoring (UVT-LIS)}
 \label{sec:method_lis}
@@ -74,6 +91,10 @@ We then form a score matrix and average interactions to obtain per-token importa
 \label{eq:method_lis_score}
 \end{equation}
 This scorer is lightweight, easy to insert into Sa2VA, and provides a token ranking over unified visual tokens that can be optimized under downstream supervision.
+We intentionally keep the scorer simple for two reasons.
+First, our goal is to evaluate the transferability of learnable selection to Sa2VA rather than to introduce a heavy auxiliary model whose gains could be attributed to extra capacity.
+Second, a lightweight scorer minimizes compatibility risk and keeps the added overhead small relative to the LLM cost that token selection is intended to reduce.
+In this sense, UVT-LIS should be viewed as a Sa2VA-oriented instantiation of learnable token scoring, not as a standalone redesign of the selector family.
 
 \subsection{Train-time differentiable selection via DiffTopK}
 \label{sec:method_difftopk}
@@ -97,6 +118,9 @@ We apply the mask by scaling token magnitudes,
 \end{equation}
 which preserves gradient flow from downstream objectives to UVT-LIS.
 In practice, this train-time soft selection lets the model learn token importance from the same multi-task supervision that drives Sa2VA itself.
+This property is particularly important in our setting because there is no obvious handcrafted proxy for which tokens are critical to future \texttt{[SEG]} generation.
+The usefulness of a token may depend on subtle target attributes, spatial relations, or temporal evidence that are only revealed through the final grounding objective.
+Soft selection therefore acts as the bridge that lets the selector discover these dependencies without breaking end-to-end optimization.
 
 \paragraph{Backward pass via implicit differentiation.}
 We differentiate $\mathbf{M}=\sigma(\mathbf{s}+t)$ under the implicit constraint $\sum_{i=1}^{N}\sigma(s_i+t)=k$.
@@ -128,6 +152,10 @@ At inference, we replace the soft relaxation with standard hard Top-$k$ selectio
 and physically remove low-score tokens before they enter the MLLM.
 This step is what yields actual memory and latency reductions at test time.
 We evaluate multiple retention ratios (e.g., 40\%/30\%/20\%/10\%) to quantify how token budget affects both task performance and efficiency, while keeping Sa2VA's downstream interface in \eqref{eq:sa2va_unified_task} unchanged.
+This separation between soft training and hard inference is deliberate.
+If hard pruning were used throughout training, optimization would become unstable and the selector could converge too early to poor token subsets.
+If soft masking were also used at inference, the method would no longer produce the real sequence-length reduction needed for practical efficiency gains.
+Sa2VA-Select therefore treats soft and hard selection as complementary phases: one for learning token importance, the other for realizing deployable compression.
 
 \subsection{Curriculum annealing strategy (CAS) for multi-task training}
 \label{sec:method_cas}
@@ -147,6 +175,9 @@ We define the constraint by encouraging the soft mask $\mathbf{M}_{\mathrm{soft}
 \label{eq:method_constraint_bce}
 \end{equation}
 This encourages the soft mask to become more polarized over training, so that the eventual switch to hard pruning causes less mismatch.
+The role of CAS is especially important in Sa2VA because the costs of train--test mismatch are amplified by unified dense grounding.
+If the soft mask used during training remains too diffuse, the MLLM may implicitly rely on weak contributions from many tokens that will later be removed under hard Top-$k$ inference.
+That mismatch can be particularly harmful for segmentation-sensitive outputs, where local evidence loss may cause target drift, distractor confusion, or degraded mask precision even when language output still appears reasonable.
 
 The weighting coefficient $\lambda_t$ follows a curriculum annealing schedule.
 Early in training, we keep $\lambda_t$ small so that optimization is dominated by downstream task learning; later, we gradually increase its value so that the model is increasingly optimized under a sharper selection constraint:
@@ -155,6 +186,8 @@ Early in training, we keep $\lambda_t$ small so that optimization is dominated b
 \label{eq:method_cas_schedule}
 \end{equation}
 This schedule is especially useful in our setting because segmentation quality and language quality may respond differently to aggressive token reduction.
+Early-stage flexibility lets Sa2VA-Select first identify broadly useful evidence under the baseline supervision, whereas late-stage annealing encourages the selector to commit to a budget-feasible ranking that better matches inference.
+In other words, CAS should be interpreted not as a new standalone objective, but as a compatibility mechanism that stabilizes the transfer of learnable token selection into Sa2VA's multi-task dense grounding regime.
 
 \subsection{Positional encoding (implementation detail)}
 \label{sec:method_rope}
