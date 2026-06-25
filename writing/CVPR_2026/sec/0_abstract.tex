@@ -1,13 +1,13 @@
 \begin{abstract}
 Unified multimodal models for dense grounded understanding must support both language interaction and pixel-level outputs over images and videos, which leads to large visual token budgets and high inference cost.
-While learnable visual token selection has shown promise in VQA-style multimodal large language models, it remains unclear whether such compression is still effective in unified dense grounding systems, where token reduction may directly affect segmentation-sensitive intermediate representations.
-In this work, we study this question on Sa2VA and present \textbf{Sa2VA-Select}, a compatible extension that applies learnable visual token selection to Sa2VA's unified visual stream before the multimodal LLM.
-Our design combines a lightweight importance scorer, a train-time differentiable budgeted selector, and a curriculum constraint that improves the transition from soft selection during training to hard Top-$k$ pruning at inference.
-The key goal is not merely to reduce visual tokens, but to preserve the evidence most helpful for generating accurate \texttt{[SEG]} tokens and maintaining Sa2VA's joint segmentation-and-conversation capability.
+While learnable visual token selection has shown promise in VQA-style multimodal large language models, it remains unclear whether it still works in unified dense grounding systems, where token reduction may directly affect segmentation-sensitive intermediate representations.
+In this work, we study this question on Sa2VA and present \textbf{Sa2VA-Select}, a compatible extension that transfers learnable visual token selection to Sa2VA's unified visual stream before the multimodal LLM.
+Rather than redesigning the baseline task interface, Sa2VA-Select preserves Sa2VA's original segmentation-and-conversation pipeline and learns which visual tokens should be retained under a given budget.
 
-Experiments on image and video dense grounding benchmarks show that learnable token selection remains effective in this more demanding setting.
-On Sa2VA-1B, Sa2VA-Select retains strong multi-task performance under substantial token reduction, and even improves several segmentation benchmarks at moderate retention ratios.
-For example, at 30\% retention it improves ReVOS from 47.6 to 51.3 while reducing peak GPU memory from 2.76 to 2.46 GB and prefill time from 40.16 to 35.14 ms.
+Experiments show that learnable token selection remains effective in this more demanding setting.
+On Sa2VA-1B, Sa2VA-Select preserves strong multi-task performance under substantial token reduction and improves several dense grounding benchmarks at moderate retention ratios.
+At 30\% retention, it improves ReVOS from 47.6 to 51.3 while reducing peak GPU memory from 2.76 to 2.46 GB and prefill time from 40.16 to 35.14 ms.
+Across retention ratios, 30--40\% emerges as the preferred operating region, offering the most favorable trade-off between dense grounding quality and efficiency in our current setting.
 On Ref-SAV, our 1B model reaches 57.6 J\&F, surpassing both Sa2VA-8B (50.0) and zero-shot Sa2VA-8B (41.3) under our evaluation protocol.
-These results demonstrate a favorable accuracy--efficiency trade-off for unified dense grounded image and video understanding.
+These results show that learnable token selection can be compatibly integrated into unified dense grounded image-video models and provide a favorable accuracy--efficiency trade-off.
 \end{abstract}

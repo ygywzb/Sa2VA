@@ -1,36 +1,27 @@
 \section{Related Work}
 \label{sec:related}
 
-We review three lines of work most relevant to this paper: dense grounded multimodal understanding, visual token compression in MLLMs, and learnable token selection under explicit token budgets.
-These directions intersect in our setting, but they are usually studied separately.
-Dense grounded systems emphasize mask quality and grounding fidelity, token compression studies often focus on reducing MLLM cost, and learnable selection methods are commonly validated on question-answering-oriented settings.
-By contrast, our goal is to transfer a learnable selector into a unified image-video dense grounding model and evaluate whether token reduction remains reliable when segmentation-sensitive outputs, temporal tracking, and multimodal conversation must all be preserved within the same visual stream.
+We briefly discuss three directions most relevant to this work: unified dense grounded MLLMs, visual token compression, and learnable budgeted selection.
+Our setting differs from standard VQA-style compression because token reduction must preserve segmentation quality, temporal grounding, and multimodal conversation within one model.
 
 \paragraph{Dense grounded multimodal understanding.}
-Recent MLLMs have achieved strong vision-language reasoning, but dense grounding requires them to support pixel-level outputs rather than only text answers.
-Recent systems increasingly move beyond standalone segmentation heads or task-specific pipelines and instead seek a unified interface that supports image grounding, video grounding, and open-ended conversation within one model.
-Sa2VA is a representative example of this trend: it combines SAM2 with an MLLM, unifies text, image, and video into a shared token space, and uses language-generated \texttt{[SEG]} tokens as segmentability cues for mask decoding.
-This design is attractive because it supports diverse grounded tasks with a common architecture, but it also raises a more difficult efficiency problem than in text-only or image-QA settings.
-The visual stream is not merely an auxiliary encoder output; it is the shared carrier of spatial detail, temporal continuity, and prompt-conditioned evidence that later affects both mask generation and textual responses.
-Accordingly, token reduction in such a model must be judged not only by generic reasoning accuracy, but also by whether it preserves dense grounding fidelity across images and videos.
-Our work builds directly on this unified dense grounding setting and asks whether the pre-LLM visual stream can be compressed in a way that remains compatible with the baseline task interface and supervision.
+Dense grounding extends multimodal understanding from text answers to pixel-level outputs.
+Recent works explore this direction from image grounding, region captioning, and referring segmentation perspectives, including Osprey~\cite{yuan2024osprey}, LISA~\cite{lai2023lisa}, GLaMM~\cite{rasheed2024glamm}, OMG-LLaVA~\cite{zhang2024omgllava}, and VISA~\cite{yan2024visa}.
+At the same time, unified MLLMs such as LLaVA~\cite{liu2023visual} and LLaVA-OneVision~\cite{li2024llavaonevision} push toward broader task coverage across image and video inputs.
+Sa2VA~\cite{yuan2025sa2va} combines these trends by integrating SAM2~\cite{ravi2024sam2} with an MLLM and exposing a shared image-video dense grounding interface.
+This unified design is what makes token reduction more delicate in our setting: the compressed visual stream must still preserve spatial detail, temporal continuity, and prompt-conditioned evidence for both conversation and mask decoding.
 
 \paragraph{Visual token compression in MLLMs.}
 Visual token compression aims to reduce the number of tokens processed by the LLM while preserving task performance.
-Earlier approaches often rely on heuristic pruning, fixed downsampling, token merging, or architecture-specific compression rules.
-These strategies can be effective for lowering compute, but they may become brittle when the retained token budget is small or when token importance depends strongly on the user instruction and local visual evidence.
-More recent work therefore explores adaptive or learnable compression, where the model predicts which visual tokens should be preserved for downstream reasoning.
-VisionSelector is particularly relevant to our study because it frames token reduction as a lightweight plug-and-play selection problem equipped with a learnable scorer, a differentiable Top-$k$ relaxation, and a curriculum mechanism for narrowing the train--test gap between soft selection and hard pruning.
-Its results suggest that learnable token selection can outperform heuristic compression under challenging budgets.
-However, the reported setting is still substantially different from ours.
-In our case, the selected tokens must continue to support segmentation-sensitive grounded decoding inside Sa2VA rather than only preserve answer quality in a VQA-style multimodal pipeline.
-This changes both the insertion point and the failure modes: removing a seemingly redundant token may degrade not only semantic reasoning, but also spatial precision, target disambiguation, and temporal consistency.
+Earlier approaches often rely on heuristic pruning, fixed downsampling, token merging, or architecture-specific compression rules~\cite{yang2024visionzip,zhang2024sparsevlm,zhu2024focusllava,yao2024deco}.
+These methods reduce compute effectively, but are mostly validated on question-answering-oriented MLLMs.
+More recent approaches move toward adaptive compression and inference-compatible pruning~\cite{yang2025topv,zhu2025visionselector}.
+VisionSelector~\cite{zhu2025visionselector} is closest to our goal because it couples a learnable scorer with differentiable Top-$k$ training and hard inference-time pruning.
+Our difference is the target model: instead of compressing a general VQA-style MLLM, we study whether learnable selection remains reliable inside Sa2VA's segmentation-sensitive unified visual stream.
 
 \paragraph{Learnable selection for unified dense grounding.}
-Token selection in Sa2VA is not equivalent to token selection in conventional multimodal QA systems.
-Sa2VA must jointly handle segmentation and conversation, and its visual input is itself heterogeneous: the MLLM consumes both ordinary image/video tokens and visual-prompt-conditioned tokens that encode grounding cues.
-As a result, selection is more tightly coupled to downstream mask quality and is more vulnerable to local evidence loss than in settings where the final target is only a text string.
-This distinction is important for positioning our work.
-We do not claim LIS, DiffTopK, or CAS as new algorithms proposed from scratch here.
-Instead, we study how to \emph{transfer} learnable token selection into a unified dense grounded model, where compatibility with the baseline architecture and supervision is essential.
-Our contribution therefore lies in identifying a Sa2VA-appropriate insertion point, integrating the selector into the unified visual stream without changing the downstream interface, and providing experimental evidence that this transferred design can improve dense grounding quality while reducing visual token cost.
+The key distinction of our work is therefore not a new selector algorithm, but a new transfer setting.
+Sa2VA must jointly handle segmentation and conversation, and its visual input mixes ordinary image/video tokens with visual-prompt-conditioned tokens.
+This makes token selection more tightly coupled to mask quality and temporal grounding than in conventional multimodal QA.
+Accordingly, we do not present LIS, DiffTopK, or CAS as newly invented here.
+Our contribution is to integrate learnable token selection into Sa2VA's unified visual stream in a compatible way, and to verify experimentally when this transfer improves dense grounding under explicit token budgets.
