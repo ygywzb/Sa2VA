@@ -63,3 +63,56 @@
 16. yan2024visa
    Title: VISA: Reasoning Video Object Segmentation via Large Language Models
    Checked from: Sa2VA local PDF reference list
+
+17. lai2023lisa
+   Title: LISA: Reasoning Segmentation via Large Language Model
+   Checked from: arXiv verification
+   Note: corrected a previously incorrect placeholder that had accidentally used the VideoLISA paper metadata under the LISA key.
+
+18. zhang2023llavagrounding
+   Title: LLaVA-Grounding: Grounded Visual Chat with Large Multimodal Models
+   Checked from: Sa2VA local PDF reference list and arXiv verification
+
+19. wu2024flmm
+   Title: F-LMM: Grounding Frozen Large Multimodal Models
+   Checked from: Sa2VA local PDF reference list and arXiv verification
+
+20. bai2024videolisa
+   Title: One Token to Seg Them All: Language Instructed Reasoning Segmentation in Videos
+   Checked from: Sa2VA local PDF reference list and arXiv verification
+
+21. chen2024fastv
+   Title: An Image is Worth 1/2 Tokens After Layer 2: Plug-and-Play Inference Acceleration for Large Vision-Language Models
+   Checked from: VisionSelector local PDF appendix/reference text and arXiv verification
+
+22. zhang2024groundhog
+   Title: GROUNDHOG: Grounding Large Language Models to Holistic Segmentation
+   Checked from: arXiv verification
+
+23. zhang2024psalm
+   Title: PSALM: Pixelwise SegmentAtion with Large Multi-Modal Model
+   Checked from: arXiv verification
+
+24. ren2023pixellm
+   Title: PixelLM: Pixel Reasoning with Large Multimodal Model
+   Checked from: arXiv verification
+
+25. xia2023gsva
+   Title: GSVA: Generalized Segmentation via Multimodal Large Language Models
+   Checked from: arXiv verification
+
+26. wei2024hyperseg
+   Title: HyperSeg: Towards Universal Visual Segmentation with Large Language Model
+   Checked from: arXiv verification
+
+27. bolya2022tome
+   Title: Token Merging: Your ViT But Faster
+   Checked from: arXiv verification
+
+28. yu2016modeling
+   Title: Modeling Context in Referring Expressions
+   Checked from: arXiv verification
+
+29. ding2023mevis
+   Title: MeViS: A Large-scale Benchmark for Video Segmentation with Motion Expressions
+   Checked from: arXiv verification

@@ -9,8 +9,8 @@ Unless otherwise specified, all comparisons are against Sa2VA-1B under multiple 
 We test retention ratios $\rho\in\{0.4,0.3,0.2,0.1\}$, corresponding to keeping the top 40\%/30\%/20\%/10\% visual tokens at inference.
 
 \paragraph{Tasks and metrics.}
-For image referring segmentation, we report cIoU on RefCOCO, RefCOCO+, and RefCOCOg.
-For video referring segmentation, we report J\&F on MeViS, Ref-DAVIS17, ReVOS, and Ref-YTVOS; MeViS (val\_u) is also used in efficiency analysis.
+For image referring segmentation, we report cIoU on RefCOCO, RefCOCO+, and RefCOCOg~\cite{yu2016modeling}.
+For video referring segmentation, we report J\&F on MeViS~\cite{ding2023mevis}, Ref-DAVIS17, ReVOS, and Ref-YTVOS; MeViS (val\_u) is also used in efficiency analysis.
 For multimodal conversation, we follow standard benchmark protocols, including MME, MMBench, SEED-Bench, AI2D, MMStar, MMMU, and SQA$^{\mathrm{test}}$.
 
 \paragraph{Training datasets and finetuning scope.}

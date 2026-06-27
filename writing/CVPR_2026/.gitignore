@@ -71,3 +71,5 @@ paper_pdf/
 # exclude pdf
 figure/*.pdf
 figure/**/*.pdf
+
+exp_data/pdf_extract/**

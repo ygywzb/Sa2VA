@@ -6,14 +6,14 @@ Our setting differs from standard VQA-style compression because token reduction 
 
 \paragraph{Dense grounded multimodal understanding.}
 Dense grounding extends multimodal understanding from text answers to pixel-level outputs.
-Recent works explore this direction from image grounding, region captioning, and referring segmentation perspectives, including Osprey~\cite{yuan2024osprey}, LISA~\cite{lai2023lisa}, GLaMM~\cite{rasheed2024glamm}, OMG-LLaVA~\cite{zhang2024omgllava}, and VISA~\cite{yan2024visa}.
+Recent works explore this direction from image grounding, grounded visual chat, region captioning, and referring segmentation perspectives, including LISA~\cite{lai2023lisa}, Osprey~\cite{yuan2024osprey}, LLaVA-Grounding~\cite{zhang2023llavagrounding}, GLaMM~\cite{rasheed2024glamm}, F-LMM~\cite{wu2024flmm}, PixelLM~\cite{ren2023pixellm}, GSVA~\cite{xia2023gsva}, GroundHog~\cite{zhang2024groundhog}, PSALM~\cite{zhang2024psalm}, OMG-LLaVA~\cite{zhang2024omgllava}, VideoLISA~\cite{bai2024videolisa}, HyperSeg~\cite{wei2024hyperseg}, and VISA~\cite{yan2024visa}.
 At the same time, unified MLLMs such as LLaVA~\cite{liu2023visual} and LLaVA-OneVision~\cite{li2024llavaonevision} push toward broader task coverage across image and video inputs.
 Sa2VA~\cite{yuan2025sa2va} combines these trends by integrating SAM2~\cite{ravi2024sam2} with an MLLM and exposing a shared image-video dense grounding interface.
 This unified design is what makes token reduction more delicate in our setting: the compressed visual stream must still preserve spatial detail, temporal continuity, and prompt-conditioned evidence for both conversation and mask decoding.
 
 \paragraph{Visual token compression in MLLMs.}
 Visual token compression aims to reduce the number of tokens processed by the LLM while preserving task performance.
-Earlier approaches often rely on heuristic pruning, fixed downsampling, token merging, or architecture-specific compression rules~\cite{yang2024visionzip,zhang2024sparsevlm,zhu2024focusllava,yao2024deco}.
+Earlier approaches often rely on heuristic pruning, attention-based early pruning, fixed downsampling, token merging, or architecture-specific compression rules~\cite{bolya2022tome,chen2024fastv,yang2024visionzip,zhang2024sparsevlm,zhu2024focusllava,yao2024deco}.
 These methods reduce compute effectively, but are mostly validated on question-answering-oriented MLLMs.
 More recent approaches move toward adaptive compression and inference-compatible pruning~\cite{yang2025topv,zhu2025visionselector}.
 VisionSelector~\cite{zhu2025visionselector} is closest to our goal because it couples a learnable scorer with differentiable Top-$k$ training and hard inference-time pruning.
