@@ -41,12 +41,12 @@
             }
         },
         {
-            "name": "sa2va_in25_4b_bgt30_debug",
+            "name": "sa2va_in25_1b_bgt40_re_full_0_3x_debug",
             "type": "debugpy",
             "request": "launch",
             "program": "tools/train.py",
             "args": [
-                "projects/sa2va/configs/dev/sa2va_in25_4b_bgt30_debug.py", 
+                "projects/sa2va/configs/re/full/sa2va_in25_1b_bgt40_re_full_0_3x.py", 
                 "--deepspeed", "deepspeed_zero2"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
@@ -55,7 +55,7 @@
                 "PYTHONPATH": "${workspaceFolder}", // 必须要加，不然会找不到本地模块(如projects)
                 "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300",
                 // "CUDA_PATH": "/usr/local/cuda-12.4", // 除非环境有全局CUDA_PATH变量，否则必须提供，导包过程需要
-                "CUDA_VISIBLE_DEVICES": "0", // 训练指定可见GPU
+                "CUDA_VISIBLE_DEVICES": "1", // 训练指定可见GPU
             }
         },
         {
@@ -81,17 +81,17 @@
             "request": "launch",
             "program": "tools/convert_to_hf_dev.py",
             "args": [
-                "projects/sa2va/configs/sa2va_in25_1b_dev_debug.py", 
-                "work_dirs/sa2va_in25_1b_dev_debug/iter_436.pth",
-                "--save-path", "pretrained/sa2va-dev-models/Sa2VA-1B"],
+                "projects/sa2va/configs/re/sa2va_in25_1b_bgt40_re.py", 
+                "work_dirs/sa2va_in25_1b_bgt40_re/iter_72260.pth",
+                "--save-path", "work_dirs/sa2va_in25_1b_bgt40_re/sa2va_in25_1b_bgt40_re_hf"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
                 "PYTHONPATH": "${workspaceFolder}", // 必须要加，不然会找不到本地模块(如projects)
                 "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "300",
-                "CUDA_PATH": "/usr/local/cuda-12.4", // 除非环境有全局CUDA_PATH变量，否则必须提供，导包过程需要
-                "CUDA_VISIBLE_DEVICES": "0", // 训练指定可见GPU
+                // "CUDA_PATH": "/usr/local/cuda-12.4", // 除非环境有全局CUDA_PATH变量，否则必须提供，导包过程需要
+                "CUDA_VISIBLE_DEVICES": "2", // 训练指定可见GPU
             }
         },
         {

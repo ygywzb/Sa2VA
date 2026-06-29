@@ -121,33 +121,39 @@ class InternVLMLLM_Train_Dev(InternVLMLLM_Train):
         # 1. 目前加的打分机制必须针对于每个batch的所有小图，不能把所有batch拼一起，必须每个batch分开打分，最后再把结果拼一起
         # 2. 而且在推理过程也是一样，要先按batch分开打分再合并，我需要记住每个batch的小图数量
         # 3. 
+        # 问题：
+        # 训练加入纯对话后，没有了图片的话应该怎么设置这个模块的损失？
         # -------创新代码加在这里------
-        hidden_states = visual_embeds
-        hidden_states_unsqueezed = hidden_states.unsqueeze(0)
-        learned_scores = self.model.importance_scorer(hidden_states_unsqueezed).squeeze(
-            0
-        )
-        total_tokens = learned_scores.shape[0]
-        k = int(total_tokens * self.budgets)
-        img_mask = topk(learned_scores.unsqueeze(0), k).squeeze(0)
-        img_mask_expanded = img_mask.unsqueeze(1).expand(
-            -1, hidden_states_unsqueezed.shape[-1]
-        )
-        hidden_states_new = img_mask_expanded * hidden_states
-        hidden_states_new = hidden_states_new.type(hidden_states.dtype)
+        if visual_embeds.shape[0] != 0:
+            hidden_states = visual_embeds
+            hidden_states_unsqueezed = hidden_states.unsqueeze(0)
+            learned_scores = self.model.importance_scorer(hidden_states_unsqueezed).squeeze(
+                0
+            )
+            total_tokens = learned_scores.shape[0]
+            k = int(total_tokens * self.budgets)
+            img_mask = topk(learned_scores.unsqueeze(0), k).squeeze(0)
+            img_mask_expanded = img_mask.unsqueeze(1).expand(
+                -1, hidden_states_unsqueezed.shape[-1]
+            )
+            hidden_states_new = img_mask_expanded * hidden_states
+            hidden_states_new = hidden_states_new.type(hidden_states.dtype)
 
-        with torch.no_grad():
-            constraint_topk_indices = learned_scores.topk(k, dim=0).indices
-            constraint_img_mask = torch.zeros_like(
-                learned_scores, device=learned_scores.device
-            )
-            constraint_img_mask.scatter_(
-                dim=-1, index=constraint_topk_indices, value=1.0
-            )
-        # 计算出打分损失
-        scorer_loss = F.binary_cross_entropy(img_mask, constraint_img_mask)
-        visual_embeds = hidden_states_new
+            with torch.no_grad():
+                constraint_topk_indices = learned_scores.topk(k, dim=0).indices
+                constraint_img_mask = torch.zeros_like(
+                    learned_scores, device=learned_scores.device
+                )
+                constraint_img_mask.scatter_(
+                    dim=-1, index=constraint_topk_indices, value=1.0
+                )
+            # 计算出打分损失
+            scorer_loss = F.binary_cross_entropy(img_mask, constraint_img_mask)
+            visual_embeds = hidden_states_new
         # --------创新代码结束-----------
+        else:
+            # 这里改成tensor，而且不要连带着前面的参数
+            scorer_loss = torch.zeros((), device=visual_embeds.device, dtype=visual_embeds.dtype)
 
         # Embed visual features into text embeddings
         input_embeds = self._embed_visual_features(

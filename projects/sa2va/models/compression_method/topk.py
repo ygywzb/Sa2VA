@@ -31,7 +31,7 @@ class TopK(Function):
 @torch.no_grad()
 def _find_ts(xs, k):
     b, n = xs.shape
-    assert 0 < k < n
+    assert 0 < k < n, f"k is {k}, n is {n}, b is {b}"
     # Lo should be small enough that all sigmoids are in the 0 area.
     # Similarly Hi is large enough that all are in their 1 area.
     lo = -xs.max(dim=1, keepdims=True).values - 10
