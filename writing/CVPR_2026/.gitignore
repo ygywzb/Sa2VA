@@ -73,3 +73,4 @@ figure/*.pdf
 figure/**/*.pdf
 
 exp_data/pdf_extract/**
+exp_data/*.txt
